@@ -1,0 +1,10 @@
+[package]
+name = "desktop-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+core-parser = { path = "../../../crates/core-parser" }
+core-store = { path = "../../../crates/core-store" }
+core-domain = { path = "../../../crates/core-domain" }

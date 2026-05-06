@@ -1,0 +1,20 @@
+{
+  "name": "mtg-companion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:ts": "vitest run",
+    "test:rust": "cargo test --workspace",
+    "test:python": "python3 -m unittest discover -s services/archidekt-connector/tests -p \"test_*.py\"",
+    "test": "npm run typecheck && npm run test:ts && npm run test:rust && npm run test:python"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

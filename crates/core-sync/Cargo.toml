@@ -1,0 +1,9 @@
+[package]
+name = "core-sync"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+core-domain = { version = "0.1.0", path = "../core-domain" }
+serde_json = "1.0.149"

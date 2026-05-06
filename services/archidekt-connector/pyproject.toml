@@ -1,0 +1,12 @@
+[project]
+name = "mtg-companion-archidekt-connector"
+version = "0.1.0"
+description = "Read-only Archidekt connector for MTG Companion"
+requires-python = ">=3.12"
+dependencies = [
+  "pyrchidekt",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

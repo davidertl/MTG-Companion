@@ -1,7 +1,7 @@
 ---
 title: feat: Build the unified MTG companion platform foundation
 type: feat
-status: active
+status: completed
 date: 2026-05-06
 ---
 
