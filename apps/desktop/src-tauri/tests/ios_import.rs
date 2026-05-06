@@ -17,7 +17,7 @@ fn temp_path(name: &str) -> PathBuf {
 
 #[test]
 fn imports_dragged_ios_log_files_and_tags_sessions_as_ios() {
-    let log_path = temp_path("ios-file.log");
+    let log_path = temp_path("ios-file").with_extension("log");
     fs::write(
         &log_path,
         "\
