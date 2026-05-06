@@ -2,6 +2,64 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PlatformTag {
+    Desktop,
+    Ios,
+}
+
+impl PlatformTag {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Desktop => "desktop",
+            Self::Ios => "ios",
+        }
+    }
+
+    pub fn from_label(label: &str) -> Self {
+        match label {
+            "ios" => Self::Ios,
+            _ => Self::Desktop,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ImportSourceKind {
+    LiveWatch,
+    DragAndDrop,
+    FolderImport,
+}
+
+impl ImportSourceKind {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::LiveWatch => "live-watch",
+            Self::DragAndDrop => "drag-and-drop",
+            Self::FolderImport => "folder-import",
+        }
+    }
+
+    pub fn from_label(label: &str) -> Self {
+        match label {
+            "drag-and-drop" => Self::DragAndDrop,
+            "folder-import" => Self::FolderImport,
+            _ => Self::LiveWatch,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogSession {
+    pub session_id: String,
+    pub platform_tag: PlatformTag,
+    pub source_kind: ImportSourceKind,
+    pub source_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RawChunk {
     pub session_id: String,
     pub offset: u64,

@@ -1,3 +1,10 @@
+CREATE TABLE IF NOT EXISTS log_sessions (
+  session_id TEXT PRIMARY KEY,
+  platform_tag TEXT NOT NULL,
+  source_kind TEXT NOT NULL,
+  source_path TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS raw_chunks (
   session_id TEXT NOT NULL,
   chunk_offset INTEGER NOT NULL,

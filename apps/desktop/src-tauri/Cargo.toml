@@ -8,3 +8,4 @@ license.workspace = true
 core-parser = { path = "../../../crates/core-parser" }
 core-store = { path = "../../../crates/core-store" }
 core-domain = { path = "../../../crates/core-domain" }
+sha2 = "0.10.9"

@@ -9,6 +9,7 @@ Die Zielplattform ist **kein reiner Upload-Client** und ebenso **kein reiner Loc
 - Der **Companion** ist lokal voll nutzbar und bleibt auch ohne Account oder Server sinnvoll.
 - Das **Backend** erweitert den lokalen Client um Sync, Aggregationen, geräteuebergreifende Nutzung und integrationsgetriebene Mehrwerte.
 - Die **MTG-Arena-Anbindung** erfolgt strikt ueber read-only Log Parsing.
+- **iOS/iPadOS** wird nur ueber Offline-Logimport in den Desktop-Companion eingebunden, nicht ueber Live-Erfassung.
 - **Archidekt** wird als echte Produktintegration eingeplant, aber so, dass sein Ausfall den Companion nicht unbrauchbar macht.
 - Neue Projektergebnisse in diesem Repo stehen unter **Apache-2.0**.
 
@@ -52,11 +53,17 @@ Die Plattform ist **nicht** als servicezentrierter Thin Client geplant. Der Serv
    - Keine Netzwerk-Interception
    - Keine Spielmanipulation
 
-4. **Archidekt als Produktintegration**
+4. **iOS/iPadOS nur als Offline-Importpfad**
+   - Der Desktop-Client darf exportierte MTG-Arena-Logs von iPhone/iPad importieren.
+   - Unterstuetzt werden Drag & Drop von `.log`-Dateien, Ordnerimport und wiederholte Importe mit Deduplizierung.
+   - Nicht Teil der Zielarchitektur sind Live-Tracking, Overlay, Packet Capture, Jailbreak-Zugriff, Memory Inspection oder direkter Cross-App-Sandbox-Zugriff.
+   - Eine spaetere iOS-App ist nur als Viewer-, Sync- oder Import-Helper einzuordnen.
+
+5. **Archidekt als Produktintegration**
    - Archidekt wird nicht als spaeteres Nice-to-have behandelt.
    - Import, Deck-Abgleich und lokale Deck-Snapshots werden als Teil des Plattformmodells vorgesehen.
 
-5. **Apache-2.0 fuer neue Projektarbeit**
+6. **Apache-2.0 fuer neue Projektarbeit**
    - Clean-room-Neuimplementierung statt Copy/Paste aus GPL-Codebasen
    - Besonders wichtig: kein direkter Code-Reuse aus `rconroy293/mtga-log-client`, wenn die Gesamtanwendung Apache-2.0 bleiben soll
 
@@ -75,6 +82,7 @@ Der lokale Client besitzt die fuer den Nutzer sichtbare Basiskompetenz:
 - lokale Such- und Filteransichten
 - lokale Exporte und Backups
 - lokale Deck- und Matchprojektionen
+- lokaler Import exportierter iOS/iPadOS-Logs
 
 ### 2. Klare Trennung zwischen Kern, Projektionen und Integrationen
 
@@ -131,7 +139,7 @@ flowchart LR
 
 | Ebene | Verantwortung | Muss offline funktionieren? |
 |---|---|---|
-| Desktop Companion | Log-Watching, Parser, lokaler Store, Overlay, History, Exporte, lokale Deck- und Matchansichten | Ja |
+| Desktop Companion | Log-Watching, Parser, lokaler Store, Overlay, History, Exporte, lokale Deck- und Matchansichten, iOS-Offline-Import | Ja |
 | Optionales Backend | Auth, Sync, Konfliktaufloesung, geraeteuebergreifende Daten, Sharing, Aggregationen | Nein |
 | Integrationsdienste | Archidekt-Import, spaetere Web- oder Datenquellen | Nein |
 | Card-Data Pipeline | Scryfall-/MTGJSON-Snapshots, lokale Caches, Server-Seed-Daten | Teilweise |
@@ -170,6 +178,40 @@ Das Backend darf **nicht** Voraussetzung fuer folgende Faehigkeiten sein:
 - Collection- und Economy-Snapshots
 - lokale Replay-/Timeline-Daten
 - lokale Exporte
+- iOS/iPadOS-Logimport in den Desktop-Client
+
+---
+
+## iOS/iPadOS-Offline-Import
+
+### Produktgrenze
+
+iPhone- und iPad-Unterstuetzung ist fuer diese Produktlinie **Import-zentriert**, nicht live:
+
+- Der Desktop-Client importiert exportierte MTG-Arena-Logdateien von iOS/iPadOS.
+- Der Import ist lokal und offline-first.
+- Die App verlangt **nicht** iTunes speziell; auf Windows wird **Apple Devices** genannt, auf macOS **Finder**, wenn die MTG-Arena-Dateien dort sichtbar sind.
+- Wenn MTG Arena in Apple Devices/Finder nicht sichtbar ist, darf die Hilfe auf Drittanbieter-Dateiuebertragungs-Tools verweisen, solange diese nur den Dateiexport ermoeglichen.
+
+### Unterstuetzter Flow
+
+- Drag & Drop einzelner oder mehrerer `.log`-Dateien
+- Ordnerimport mit rekursiver Suche nach `.log`-Dateien
+- Wiederholte Importe mit Deduplizierung ueber stabile Session-/Chunk-Identitaeten
+- Plattform-Tagging importierter Sessions als `ios`
+
+### Explizite Nicht-Ziele
+
+- kein Live-Tracking auf iPad/iPhone
+- kein iOS-Overlay
+- kein Packet Capture
+- kein Jailbreak-Zugriff
+- keine Memory Inspection
+- kein direkter Zugriff auf App-Sandboxen anderer iOS-Apps
+
+### Zukuenftige iOS-App
+
+Falls spaeter eine iOS-App entsteht, ist sie in dieser Architektur als **Viewer-, Sync- oder Import-Helper** zu behandeln. Sie ist nicht der Ort fuer invasive Tracking-Techniken oder fuer Desktop-paritaetes Live-Overlay.
 
 ---
 
@@ -263,6 +305,12 @@ Die konservative und tragfaehige Integrationslinie bleibt:
 - ausschliesslich **read-only Dateizugriff**
 - keine invasive Laufzeitbeobachtung
 
+Fuer iOS/iPadOS bedeutet das ebenfalls:
+
+- nur importierte Logdateien, die der Nutzer selbst aus dem Geraet exportiert hat
+- kein direkter Zugriff in andere App-Sandboxes
+- keine Laufzeitinspektion des mobilen Clients
+
 Das reduziert ToS-, Anti-Cheat- und Reputationsrisiken.
 
 ### Lizenzmodell
@@ -286,6 +334,7 @@ Konsequenzen:
 
 - Setup-Assistent fuer Detailed Logs
 - Pfad-Autodetect fuer Windows und macOS
+- iOS/iPadOS-Offline-Import fuer exportierte `.log`-Dateien inklusive Drag & Drop, Ordnerimport und Export-Guidance
 - lokaler Event-Store
 - Match-History und Deckansichten
 - Overlay/HUD mit Kernsignalen
@@ -303,6 +352,7 @@ Konsequenzen:
 - serverseitige Aggregationsansichten
 - Team-/Coach-Funktionen
 - bidirektionale Archidekt-Flows
+- optionale iOS-App als Viewer-/Sync-/Import-Helper
 - Linux/Proton als experimenteller Pfad
 
 ---

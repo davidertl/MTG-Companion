@@ -20,6 +20,7 @@ Dieses Repository definiert die Zielarchitektur fuer eine neue App, die diese Fa
 - **Offline-first:** Parsing, lokaler Event-Store, Overlay, Match-History und Exporte funktionieren ohne Cloud.
 - **Log-only Integration:** MTG Arena wird ausschliesslich ueber read-only Log Parsing angebunden.
 - **Archidekt eingebunden:** Deck-Import und spaetere Sync-Flows werden ueber einen dedizierten Archidekt-Connector modelliert.
+- **iOS/iPadOS ueber Offline-Import:** Exportierte MTG Arena iPhone/iPad-Logs koennen lokal importiert werden, ohne Live-Tracking auf dem Geraet.
 - **Apache 2.0:** Neue Projektergebnisse in diesem Repo werden unter Apache-2.0 lizenziert.
 
 ## Dokumente
@@ -44,7 +45,8 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - `crates/core-sync` - Outbox-/Sync-Objekte fuer optionale Backend-Synchronisation
 - **Desktop-Kern**
   - `apps/desktop/src-tauri` - Offline-Bootstrap ueber Parser + Event-Store
-  - `apps/desktop/src` - route-nahe Query-, Export-, Privacy- und Deck-Cache-Logik
+  - `apps/desktop/src` - route-nahe Query-, Export-, Privacy-, Setup- und Deck-Cache-Logik
+  - inklusive iOS/iPadOS-Offline-Importflow fuer `.log`-Dateien per Drag & Drop oder Ordnerimport
 - **Backend-Grundlage**
   - `services/api/src` - optionale Sync-, Auth-, Archidekt-Import- und Telemetry-Services
   - `services/worker/src` - Hintergrundjob-Grundlage fuer serverseitige Verarbeitungsaufgaben
@@ -106,5 +108,9 @@ Das fuehrt aus:
 - Der Companion bleibt **ohne Account** und **ohne laufendes Backend** lokal nutzbar.
 - Arena wird ausschliesslich ueber **read-only Log Parsing** eingebunden.
 - Sync, Telemetrie und Archidekt sind **optional** und durch Privacy-/Mode-Logik gated.
+- iOS/iPadOS-Tracking ist **nur per Offline-Logimport** unterstuetzt; kein Live-Tracking, Overlay oder Sandbox-Zugriff auf dem Geraet.
+- Der Desktop-Companion unterstuetzt exportierte iOS-Logs per **Drag & Drop** und **Ordnerimport** mit Deduplizierung und `ios`-Plattformtagging.
+- Der Exportweg fuer iOS-Logs setzt **nicht iTunes voraus**; Apple Devices (Windows), Finder (macOS) und notfalls Drittanbieter-Dateiwerkzeuge werden als Guidance modelliert.
 - Archidekt ist in der ersten Stufe **read-only** und wird serverseitig ueber einen Connector isoliert.
+- Eine spaetere iOS-App wird nur als **Viewer/Sync/Import-Helper** betrachtet, nicht als Live-Tracker.
 - Neue Arbeit in diesem Repository bleibt **Apache-2.0-kompatibel**.

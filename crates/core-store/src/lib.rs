@@ -1,6 +1,6 @@
 use core_domain::{
-    payload_value, CollectionSnapshot, DraftPick, EventType, InventorySnapshot, MatchRecord,
-    NormalizedEvent, ParseReport,
+    payload_value, CollectionSnapshot, DraftPick, EventType, ImportSourceKind, InventorySnapshot,
+    LogSession, MatchRecord, NormalizedEvent, ParseReport, PlatformTag,
 };
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
@@ -8,6 +8,12 @@ use std::path::Path;
 
 pub struct EventStore {
     connection: Connection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PersistStats {
+    pub inserted_raw_chunks: usize,
+    pub inserted_events: usize,
 }
 
 impl EventStore {
@@ -25,15 +31,60 @@ impl EventStore {
         Ok(store)
     }
 
-    pub fn apply_report(&self, report: &ParseReport) -> rusqlite::Result<()> {
+    pub fn upsert_log_session(&self, session: &LogSession) -> rusqlite::Result<bool> {
+        let changed = self.connection.execute(
+            "INSERT OR IGNORE INTO log_sessions (session_id, platform_tag, source_kind, source_path)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                session.session_id,
+                session.platform_tag.label(),
+                session.source_kind.label(),
+                session.source_path,
+            ],
+        )?;
+        Ok(changed > 0)
+    }
+
+    pub fn load_log_sessions(&self) -> rusqlite::Result<Vec<LogSession>> {
+        let mut statement = self.connection.prepare(
+            "SELECT session_id, platform_tag, source_kind, source_path
+             FROM log_sessions
+             ORDER BY rowid ASC",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(LogSession {
+                session_id: row.get(0)?,
+                platform_tag: PlatformTag::from_label(&row.get::<_, String>(1)?),
+                source_kind: ImportSourceKind::from_label(&row.get::<_, String>(2)?),
+                source_path: row.get(3)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    pub fn count_raw_chunks(&self) -> rusqlite::Result<usize> {
+        self.connection
+            .query_row("SELECT COUNT(*) FROM raw_chunks", [], |row| row.get::<_, i64>(0))
+            .map(|count| count as usize)
+    }
+
+    pub fn count_events(&self) -> rusqlite::Result<usize> {
+        self.connection
+            .query_row("SELECT COUNT(*) FROM events", [], |row| row.get::<_, i64>(0))
+            .map(|count| count as usize)
+    }
+
+    pub fn apply_report(&self, report: &ParseReport) -> rusqlite::Result<PersistStats> {
         let transaction = self.connection.unchecked_transaction()?;
+        let mut inserted_raw_chunks = 0;
         {
             let mut statement = transaction.prepare(
                 "INSERT OR IGNORE INTO raw_chunks (session_id, chunk_offset, sha256, raw_text)
                  VALUES (?1, ?2, ?3, ?4)",
             )?;
             for chunk in &report.raw_chunks {
-                statement.execute(params![
+                inserted_raw_chunks += statement.execute(params![
                     chunk.session_id,
                     chunk.offset as i64,
                     chunk.sha256,
@@ -42,13 +93,14 @@ impl EventStore {
             }
         }
 
+        let mut inserted_events = 0;
         {
             let mut event_statement = transaction.prepare(
                 "INSERT OR IGNORE INTO events (session_id, sequence, timestamp, event_type, payload_json)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
             )?;
             for event in &report.events {
-                event_statement.execute(params![
+                inserted_events += event_statement.execute(params![
                     event.session_id,
                     event.sequence as i64,
                     event.timestamp,
@@ -58,7 +110,11 @@ impl EventStore {
             }
         }
 
-        transaction.commit()
+        transaction.commit()?;
+        Ok(PersistStats {
+            inserted_raw_chunks,
+            inserted_events,
+        })
     }
 
     pub fn load_events(&self) -> rusqlite::Result<Vec<NormalizedEvent>> {

@@ -28,6 +28,7 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 - R5. Archidekt muss als vorgesehene Produktintegration eingeplant werden, ohne den Companion an einen Online-Zwang zu koppeln.
 - R6. Neue Projektarbeit muss mit Apache-2.0 kompatibel bleiben und GPL-kontaminierenden Code-Reuse vermeiden.
 - R7. Die Architektur muss Parser-Brueche, neue Arena-Patches und spaetere Feature-Erweiterungen isolieren koennen.
+- R8. iOS/iPadOS-Tracking wird auf dem Desktop nur ueber Offline-Logimport unterstuetzt, inklusive Deduplizierung, Plattform-Tagging als `ios` und klarer Export-Guidance fuer Apple Devices/Finder.
 
 ---
 
@@ -37,6 +38,7 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 - Linux/Proton-Support ist nicht Teil des Anfangsaufbaus.
 - Bidirektionaler Archidekt-Sync ist nicht Teil der ersten Integrationsstufe.
 - Ein serverseitiges Pflichtkonto fuer Basisfunktionen ist ausgeschlossen.
+- Kein Live-Tracking, Overlay, Packet Capture, Jailbreak-/Sandbox-Zugriff oder Memory Inspection auf iOS/iPadOS.
 
 ### Deferred to Follow-Up Work
 
@@ -73,6 +75,7 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 - **Backend als API + Worker-Topologie:** Sync und Integrationen werden ueber klar getrennte Serverdienste modelliert, damit weder UI noch Parser von Integrationslaufzeiten abhaengen.
 - **Archidekt ueber separaten Python-Connector:** `pyrchidekt` wird in einem Connector/Worker isoliert, statt Python in den Desktop-Client einzubetten.
 - **Clean-room unter Apache-2.0:** Inspirationsquellen duerfen Architektur und UX beeinflussen, aber die Implementierung bleibt neu und lizenzsauber.
+- **iOS/iPadOS nur als Offline-Importpfad:** Der Desktop importiert exportierte `.log`-Dateien per Drag & Drop oder Ordnerimport, taggt Sessions als `ios` und behandelt eine spaetere iOS-App nur als Viewer-/Sync-/Import-Helper.
 
 ---
 
@@ -89,6 +92,7 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 - **Welche konkrete Backend-Technologie wird verwendet?** Die Architektur braucht API-, Queue- und Storage-Grenzen, aber das exakte Framework kann spaeter nach Team-Praeferenz entschieden werden.
 - **Wie genau wird das Overlay auf macOS und Windows technisch umgesetzt?** Die Boundary ist Teil der Planung; die finale plattformspezifische Technik muss bei der Umsetzung validiert werden.
 - **Wie weit reicht Archidekt in Version 1?** Der Plan setzt read-only Import voraus; weitergehende Write-Back-Flows haengen von API- und Produktvalidierung ab.
+- **Wie exportieren Nutzer iOS-Logs konkret?** Die Produktspur setzt Apple Devices auf Windows und Finder auf macOS als Primaerweg voraus, mit Fallback-Hinweis auf Drittanbieter-Dateiuebertragung, falls MTGA dort nicht sichtbar ist.
 
 ---
 
@@ -234,7 +238,7 @@ flowchart LR
 
 **Goal:** Die ersten Companion-Oberflaechen auf den lokalen Store aufsetzen: Setup, History, Collection/Economy, Draft und Export.
 
-**Requirements:** R1, R2, R3, R7
+**Requirements:** R1, R2, R3, R7, R8
 
 **Dependencies:** U2
 
@@ -255,6 +259,7 @@ flowchart LR
 - Den Nutzer zuerst sicher durch Detailed-Logs-Aktivierung und Pfad-Autodetect fuehren.
 - UI ausschliesslich ueber lokale Projektionen betreiben, nicht ueber direkte Parserzustande.
 - Export- und Backup-Pfade frueh mitdenken, damit der lokale Modus auch ohne Cloud glaubhaft vollwertig ist.
+- Fuer iOS/iPadOS einen separaten Offline-Importpfad mit Drag & Drop, Ordnerimport, Plattform-Tagging und Export-Hinweisen fuer Apple Devices/Finder vorsehen.
 
 **Patterns to follow:**
 - `docs/architecture/unified-mtg-companion-architecture.md`
@@ -263,7 +268,9 @@ flowchart LR
 **Test scenarios:**
 - Happy path: Ein Nutzer kann einen Log-Pfad bestaetigen und danach lokale Match-History ohne Konto sehen.
 - Happy path: Collection- und Economy-Snapshots zeigen den letzten bekannten lokalen Zustand an.
+- Happy path: Exportierte iOS-Logs koennen per Drag & Drop oder Ordnerimport importiert und als `ios` markiert werden.
 - Edge case: Ohne vorhandene Match-Daten zeigt die UI leere, aber valide Zustande statt Fehler.
+- Edge case: Wiederholte iOS-Importe derselben `.log`-Dateien erzeugen keine doppelten Sessions oder Events.
 - Error path: Wenn Detailed Logs noch nicht aktiviert sind, zeigt der Setup-Fluss konkrete Hilfestellung statt stiller Fehlfunktion.
 - Integration: Ein Export aus der lokalen History erzeugt ein konsistentes JSON- oder CSV-Artefakt, das ohne Serverbezug verwendbar ist.
 
@@ -398,6 +405,7 @@ flowchart LR
 ## System-Wide Impact
 
 - **Interaction graph:** Desktop-Ingestion, lokaler Store, UI-Projektionen, Sync-Outbox, API und Archidekt-Connector teilen Vertragsobjekte und muessen dieselben Invarianten fuer Decks, Matches und Snapshots einhalten.
+- **Import surfaces:** Desktop-Live-Logs und iOS-Offline-Logs muessen denselben Parser- und Projektionskern nutzen, sich aber in Plattform-Tagging und User-Guidance unterscheiden.
 - **Error propagation:** Parser-, Sync- und Integrationsfehler duerfen Kernworkflows nicht abbrechen; sie muessen als isolierte degradierte Zustaende sichtbar werden.
 - **State lifecycle risks:** Doppelte Events, inkonsistente Deckversionen, stale Sync-Markierungen und ueberholte Integrationssnapshots sind die zentralen Persistenzrisiken.
 - **API surface parity:** Desktop-Interaktionen, spaetere Web-Flaechen und Integrationsdienste muessen auf denselben Shared-Schema-Vertrag zugreifen.

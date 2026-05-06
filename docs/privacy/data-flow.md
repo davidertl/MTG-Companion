@@ -8,6 +8,7 @@ or a running backend.
 Local-only capabilities:
 
 - read MTG Arena log files from disk
+- import MTG Arena iOS/iPadOS log exports from `.log` files or folders
 - normalize log lines into local events
 - persist raw chunks and normalized events in the local store
 - derive match history, collection snapshots, inventory snapshots, and draft picks
@@ -36,6 +37,7 @@ The backend is additive only. It may receive:
 The backend must not be required for:
 
 - local log parsing
+- iOS/iPadOS offline log import
 - local persistence
 - match history browsing
 - collection/economy snapshots
@@ -55,5 +57,8 @@ Archidekt imports are treated as a read-only integration:
 - no memory reading
 - no packet interception
 - no DLL injection
+- no live iPad/iPhone tracking
+- no jailbreak-only access path
+- no direct cross-app sandbox access on iOS/iPadOS
 - no required telemetry
 - no mandatory account for local companion workflows
