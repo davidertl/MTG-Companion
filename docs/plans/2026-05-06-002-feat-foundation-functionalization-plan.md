@@ -9,7 +9,7 @@ date: 2026-05-06
 
 ## Summary
 
-Dieses Dokument gleicht den bestehenden Foundations-Plan mit dem echten Repo-Zustand ab und beschreibt die verbleibenden Luecken zwischen "saubere Grundstruktur" und "tatsaechlich benutzbarer Produktflaeche". Der Fokus liegt darauf, die bereits gebauten Kernmodule ueber benutzbare End-to-End-Pfade zusammenzufuehren: MancuTG-ArenaC-Import/Reporting, einen Import-Center-State und einen startbaren MancuTG-backend-Server.
+Dieses Dokument gleicht den bestehenden Foundations-Plan mit dem echten Repo-Zustand ab und beschreibt die verbleibenden Luecken zwischen "saubere Grundstruktur" und "tatsaechlich benutzbarer Produktflaeche". Der Fokus liegt darauf, die bereits gebauten Kernmodule ueber benutzbare End-to-End-Pfade zusammenzufuehren: MancuTG-ArenaC-Import/Reporting, einen Import-Center-State, einen startbaren MancuTG-backend-Server und eine gemeinsame Backend-Event-Schnittstelle fuer MancuTG-ArenaC und MancuTG-PaperC.
 
 ---
 

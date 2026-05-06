@@ -31,8 +31,22 @@ Outbound traffic is intentionally small and purpose-gated.
 MancuTG-backend is additive only. It may receive:
 
 - sync objects produced from local entities
+- shared backend event envelopes produced by MancuTG-ArenaC or MancuTG-PaperC
 - validated Archidekt import payloads
 - opt-in telemetry events
+
+### Unified event envelope
+
+Cross-client event ingestion uses one shared envelope shape regardless of producer:
+
+- `eventId`
+- `sourceApp` (`mancutg-arenac` or `mancutg-paperc`)
+- `eventType`
+- `occurredAt`
+- `payload`
+
+This keeps backend event ingestion uniform even when Arena and paper-card tracking
+produce different domain-specific payloads.
 
 MancuTG-backend must not be required for:
 

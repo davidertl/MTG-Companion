@@ -82,4 +82,46 @@ describe("api server", () => {
       error: "invalid-request",
     });
   });
+
+  it("accepts a shared backend event envelope from both ArenaC and PaperC", async () => {
+    const server = await startApiServer(0);
+    servers.push(server);
+    const address = `http://127.0.0.1:${server.port}`;
+
+    const response = await fetch(`${address}/events`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify([
+        {
+          eventId: "arenac-1",
+          sourceApp: "mancutg-arenac",
+          eventType: "arena.match.completed",
+          occurredAt: "2026-05-06T22:40:00Z",
+          payload: {
+            matchId: "match-1",
+            result: "win",
+          },
+        },
+        {
+          eventId: "paperc-1",
+          sourceApp: "mancutg-paperc",
+          eventType: "paper.round.completed",
+          occurredAt: "2026-05-06T22:41:00Z",
+          payload: {
+            round: 3,
+            table: 12,
+          },
+        },
+      ]),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      acceptedCount: 2,
+      deduplicatedCount: 0,
+      sourceApps: ["mancutg-arenac", "mancutg-paperc"],
+    });
+  });
 });

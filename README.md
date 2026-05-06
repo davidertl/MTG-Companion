@@ -149,8 +149,23 @@ npm run api:start
 Verfuegbare Endpunkte:
 
 - `GET /health`
+- `POST /events`
 - `POST /sync`
 - `GET /integrations/archidekt/:deckId`
+
+Gemeinsame Event-Huelle fuer MancuTG-ArenaC und MancuTG-PaperC:
+
+```json
+{
+  "eventId": "unique-per-producer",
+  "sourceApp": "mancutg-arenac",
+  "eventType": "arena.match.completed",
+  "occurredAt": "2026-05-06T22:40:00Z",
+  "payload": {
+    "matchId": "match-1"
+  }
+}
+```
 
 ## Audit des aktuellen Zustands
 
@@ -160,7 +175,8 @@ Verfuegbare Endpunkte:
 - degradierbares MancuTG-ArenaC-Bootstrap aus lokalen Logs
 - iOS/iPadOS-Offline-Import mit Deduplizierung und `ios`-Tagging
 - TypeScript-Desktop-State fuer Setup, History, Collection, Draft, Privacy und Import-Center in MancuTG-ArenaC
-- startbarer MancuTG-backend-Server fuer Health, Sync und Archidekt-Import
+- startbarer MancuTG-backend-Server fuer Health, gemeinsame Event-Ingestion, Sync und Archidekt-Import
+- gemeinsame Backend-Event-Schnittstelle fuer MancuTG-ArenaC und MancuTG-PaperC
 - read-only Archidekt-Connector in Python
 - MancuTG-PaperC ist als eigenstaendiger Produktname reserviert, aber noch nicht implementiert
 

@@ -24,7 +24,7 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 - R1. MancuTG-ArenaC muss ohne Account und ohne laufendes MancuTG-backend lokal nutzbar bleiben.
 - R2. Die Arena-Integration muss auf read-only Log Parsing basieren.
 - R3. Das lokale Datenmodell muss Match-History, Collection/Economy, Draft-Daten und Replay-Grundlagen tragen koennen.
-- R4. Das MancuTG-backend muss als optionale Mehrwertschicht fuer Sync, Sharing und Aggregationen modelliert werden.
+- R4. Das MancuTG-backend muss als optionale Mehrwertschicht fuer Sync, Sharing, Aggregationen und eine gemeinsame Event-Schnittstelle fuer MancuTG-ArenaC und MancuTG-PaperC modelliert werden.
 - R5. Archidekt muss als vorgesehene Produktintegration eingeplant werden, ohne den Companion an einen Online-Zwang zu koppeln.
 - R6. Neue Projektarbeit muss mit Apache-2.0 kompatibel bleiben und GPL-kontaminierenden Code-Reuse vermeiden.
 - R7. Die Architektur muss Parser-Brueche, neue Arena-Patches und spaetere Feature-Erweiterungen isolieren koennen.
@@ -303,7 +303,7 @@ flowchart LR
 **Approach:**
 - Sync ueber Outbox/Inboxes mit explizitem Dirty-Tracking modellieren.
 - Konto- und Sync-Funktionen als additive Ebene behandeln; der Desktop bleibt auch ohne Token oder Session voll nutzbar.
-- Gemeinsame Schemas fuer Desktop-zu-Server-Nachrichten frueh zentralisieren.
+- Gemeinsame Schemas fuer Desktop-/Client-zu-Server-Nachrichten frueh zentralisieren, einschliesslich einer einheitlichen Event-Huelle fuer MancuTG-ArenaC und MancuTG-PaperC.
 
 **Execution note:** Start with a failing integration test for the sync contract before filling in transport details.
 
@@ -314,6 +314,7 @@ flowchart LR
 - Happy path: Ein lokaler Companion kann eine geaenderte Entitaet als Sync-Objekt serialisieren, ohne seine lokale Autoritaet zu verlieren.
 - Edge case: Wenn kein Konto vorhanden ist, bleibt die Outbox lokal bestehen und blockiert keine Companion-Funktion.
 - Error path: Ein fehlgeschlagener Sync-Versuch markiert Daten nicht als verloren oder erfolgreich synchronisiert.
+- Integration: MancuTG-ArenaC, MancuTG-PaperC und MancuTG-backend teilen dieselbe Event-Huelle fuer backendseitige Ereignisse.
 - Integration: Desktop und Backend teilen dieselbe Payload-Definition fuer Deck-, Match- und Snapshot-Objekte.
 - Integration: Der Server akzeptiert Sync-Daten nur fuer optionale Konto-Features und veraendert keine lokal-only Kernfunktionalitaet.
 
@@ -408,7 +409,7 @@ flowchart LR
 - **Import surfaces:** Desktop-Live-Logs und iOS-Offline-Logs muessen denselben Parser- und Projektionskern nutzen, sich aber in Plattform-Tagging und User-Guidance unterscheiden.
 - **Error propagation:** Parser-, Sync- und Integrationsfehler duerfen Kernworkflows nicht abbrechen; sie muessen als isolierte degradierte Zustaende sichtbar werden.
 - **State lifecycle risks:** Doppelte Events, inkonsistente Deckversionen, stale Sync-Markierungen und ueberholte Integrationssnapshots sind die zentralen Persistenzrisiken.
-- **API surface parity:** Desktop-Interaktionen, spaetere Web-Flaechen und Integrationsdienste muessen auf denselben Shared-Schema-Vertrag zugreifen.
+- **API surface parity:** Desktop-Interaktionen, MancuTG-PaperC, spaetere Web-Flaechen und Integrationsdienste muessen auf denselben Shared-Schema-Vertrag zugreifen.
 - **Integration coverage:** Parser->Store, Store->UI, Outbox->API und API->Archidekt-Connector benoetigen echte Integrationsabdeckung; reine Unit-Tests reichen dort nicht.
 - **Unchanged invariants:** Der Companion bleibt ohne Konto nutzbar; Arena wird nur ueber Logs gelesen; Archidekt bleibt in Version 1 read-only.
 

@@ -247,6 +247,37 @@ Wichtig ist, dass **lokale Daten autoritativ fuer MancuTG-ArenaC bleiben**. Manc
 
 ---
 
+## Einheitliche Backend-Event-Schnittstelle
+
+MancuTG-backend soll Event-Erfassung nicht nur fuer MancuTG-ArenaC, sondern auch fuer MancuTG-PaperC ueber dieselbe Schnittstelle aufnehmen koennen. Dafuer gilt ein gemeinsamer Event-Umschlag:
+
+```json
+{
+  "eventId": "globally-or-producer-unique-id",
+  "sourceApp": "mancutg-arenac | mancutg-paperc",
+  "eventType": "domain.event.name",
+  "occurredAt": "2026-05-06T22:00:00Z",
+  "payload": {
+    "arbitrary": "source-specific structured data"
+  }
+}
+```
+
+### Ziele dieser Event-Huelle
+
+- **gleiche Aufnahmeschnittstelle** fuer Arena- und Papierkarten-Produzenten
+- **eindeutige Producer-Herkunft** ueber `sourceApp`
+- **Deduplizierung** ueber `sourceApp + eventId`
+- **produktuebergreifende Erweiterbarkeit**, ohne pro App eine neue Backend-Route erfinden zu muessen
+
+### Konsequenz fuer die Systemgrenzen
+
+- MancuTG-ArenaC darf Spiel-/Import-/Analyse-Ereignisse in dieser Huelle an MancuTG-backend senden.
+- MancuTG-PaperC darf spaeter Video-/Turnier-/Rundenereignisse in exakt derselben Huelle senden.
+- Sync-Objekte bleiben ein eigener Vertrag fuer Zustandsreplikation; Event-Ingestion ist eine parallele, produktuebergreifende Schnittstelle.
+
+---
+
 ## Archidekt-Integration
 
 ### Produktziel

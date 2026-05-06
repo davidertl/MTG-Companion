@@ -2,12 +2,15 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { URL } from "node:url";
 import { ZodError } from "zod";
 
+import { createInMemoryEventStore, type EventStore } from "./domain/eventService";
 import { createInMemorySyncStore, type SyncStore } from "./domain/syncService";
 import { buildArchidektImportRoute, type ArchidektFetcher } from "./routes/integrations/archidekt/import";
+import { eventsRoute } from "./routes/events";
 import { syncRoute } from "./routes/sync";
 
 export interface ApiServerOptions {
   store?: SyncStore;
+  eventStore?: EventStore;
   archidektFetcher?: ArchidektFetcher;
 }
 
@@ -28,6 +31,7 @@ const defaultArchidektFetcher: ArchidektFetcher = async (deckId) => ({
 
 export function createApiServer(options: ApiServerOptions = {}): Server {
   const store = options.store ?? createInMemorySyncStore();
+  const eventStore = options.eventStore ?? createInMemoryEventStore();
   const importDeck = buildArchidektImportRoute(options.archidektFetcher ?? defaultArchidektFetcher);
 
   return createServer(async (request, response) => {
@@ -46,6 +50,12 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
           ? authorization.slice("Bearer ".length)
           : undefined;
         const result = syncRoute(body, token, store);
+        return sendJson(response, 200, result);
+      }
+
+      if (method === "POST" && url.pathname === "/events") {
+        const body = await readJsonBody(request);
+        const result = eventsRoute(body, eventStore);
         return sendJson(response, 200, result);
       }
 
