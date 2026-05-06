@@ -1,6 +1,6 @@
 use core_domain::{ImportSourceKind, PlatformTag};
 use core_store::EventStore;
-use desktop_core::import_ios_logs;
+use mancutg_arenac::import_ios_logs;
 use std::{
     fs,
     path::PathBuf,
@@ -12,7 +12,7 @@ fn temp_path(name: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock should be after unix epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("mtg-companion-{name}-{timestamp}"))
+    std::env::temp_dir().join(format!("mancutg-arenac-{name}-{timestamp}"))
 }
 
 #[test]

@@ -1,7 +1,7 @@
 [project]
-name = "mtg-companion-archidekt-connector"
+name = "mancutg-backend-archidekt-connector"
 version = "0.1.0"
-description = "Read-only Archidekt connector for MTG Companion"
+description = "Read-only Archidekt connector for MancuTG-backend in the MancuTG-Companion project"
 requires-python = ">=3.12"
 dependencies = [
   "pyrchidekt",

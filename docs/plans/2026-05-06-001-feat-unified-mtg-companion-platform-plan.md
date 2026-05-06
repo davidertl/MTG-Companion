@@ -1,15 +1,15 @@
 ---
-title: feat: Build the unified MTG companion platform foundation
+title: feat: Build the MancuTG-Companion platform foundation
 type: feat
 status: completed
 date: 2026-05-06
 ---
 
-# feat: Build the unified MTG companion platform foundation
+# feat: Build the MancuTG-Companion platform foundation
 
 ## Summary
 
-Dieses Dokument beschreibt, wie das Repo von einer leeren Basis zu einer tragfaehigen Produktplattform fuer einen Unified MTG Arena Companion aufgebaut werden soll. Der Companion bleibt lokal und offline-first nutzbar; ein optionales Backend liefert Sync, Aggregationen und Integrationen wie Archidekt, ohne den Kernnutzen des Desktop-Clients zu uebernehmen.
+Dieses Dokument beschreibt, wie das Repo von einer leeren Basis zu einer tragfaehigen Produktplattform fuer den MancuTG-Companion aufgebaut werden soll. MancuTG-ArenaC bleibt lokal und offline-first nutzbar; das optionale MancuTG-backend liefert Sync, Aggregationen und Integrationen wie Archidekt, ohne den Kernnutzen der Desktop-App zu uebernehmen.
 
 ---
 
@@ -21,10 +21,10 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 
 ## Requirements
 
-- R1. Der Desktop-Companion muss ohne Account und ohne laufendes Backend lokal nutzbar bleiben.
+- R1. MancuTG-ArenaC muss ohne Account und ohne laufendes MancuTG-backend lokal nutzbar bleiben.
 - R2. Die Arena-Integration muss auf read-only Log Parsing basieren.
 - R3. Das lokale Datenmodell muss Match-History, Collection/Economy, Draft-Daten und Replay-Grundlagen tragen koennen.
-- R4. Das Backend muss als optionale Mehrwertschicht fuer Sync, Sharing und Aggregationen modelliert werden.
+- R4. Das MancuTG-backend muss als optionale Mehrwertschicht fuer Sync, Sharing und Aggregationen modelliert werden.
 - R5. Archidekt muss als vorgesehene Produktintegration eingeplant werden, ohne den Companion an einen Online-Zwang zu koppeln.
 - R6. Neue Projektarbeit muss mit Apache-2.0 kompatibel bleiben und GPL-kontaminierenden Code-Reuse vermeiden.
 - R7. Die Architektur muss Parser-Brueche, neue Arena-Patches und spaetere Feature-Erweiterungen isolieren koennen.
@@ -69,10 +69,10 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 
 ## Key Technical Decisions
 
-- **Desktop-first mit optionalem Backend:** Der Companion ist das primaere Produkt, das Backend eine Zusatzschicht fuer Sync, Aggregation und Integrationen.
-- **Rust + Tauri + React fuer den Companion:** Rust kapselt Parser, File-Watching und SQLite; Tauri/React bildet die Desktop-Oberflaeche mit spaeter austauschbarer Overlay-Grenze.
-- **Append-only lokaler Event-Store:** Rohlog-Daten und normalisierte Events werden lokal gehalten, damit Parser-Hotfixes, Replays und Exporte auf derselben Basis aufbauen.
-- **Backend als API + Worker-Topologie:** Sync und Integrationen werden ueber klar getrennte Serverdienste modelliert, damit weder UI noch Parser von Integrationslaufzeiten abhaengen.
+- **MancuTG-ArenaC mit optionalem MancuTG-backend:** Die Desktop-App ist das primaere Produkt, das Backend eine Zusatzschicht fuer Sync, Aggregation und Integrationen.
+- **Rust + Tauri + React fuer MancuTG-ArenaC:** Rust kapselt Parser, File-Watching und SQLite; Tauri/React bildet die Desktop-Oberflaeche mit spaeter austauschbarer Overlay-Grenze.
+- **Append-only lokaler Event-Store:** Rohlog-Daten und normalisierte Events werden lokal in MancuTG-ArenaC gehalten, damit Parser-Hotfixes, Replays und Exporte auf derselben Basis aufbauen.
+- **MancuTG-backend als API + Worker-Topologie:** Sync und Integrationen werden ueber klar getrennte Serverdienste modelliert, damit weder UI noch Parser von Integrationslaufzeiten abhaengen.
 - **Archidekt ueber separaten Python-Connector:** `pyrchidekt` wird in einem Connector/Worker isoliert, statt Python in den Desktop-Client einzubetten.
 - **Clean-room unter Apache-2.0:** Inspirationsquellen duerfen Architektur und UX beeinflussen, aber die Implementierung bleibt neu und lizenzsauber.
 - **iOS/iPadOS nur als Offline-Importpfad:** Der Desktop importiert exportierte `.log`-Dateien per Drag & Drop oder Ordnerimport, taggt Sessions als `ios` und behandelt eine spaetere iOS-App nur als Viewer-/Sync-/Import-Helper.
@@ -83,7 +83,7 @@ Bestehende Arena-Tracker zerfallen typischerweise in zwei unbefriedigende Extrem
 
 ### Resolved During Planning
 
-- **Soll ein Backend existieren, obwohl Offline-Nutzung Pflicht ist?** Ja. Das Backend ist explizit vorgesehen, aber nie Voraussetzung fuer lokale Kernfunktionen.
+- **Soll ein MancuTG-backend existieren, obwohl Offline-Nutzung Pflicht ist?** Ja. Das Backend ist explizit vorgesehen, aber nie Voraussetzung fuer lokale Kernfunktionen.
 - **Wo wird Archidekt zuerst integriert?** Serverseitig in einem eigenen Connector auf Basis von `pyrchidekt`, mit lokalem Cache auf Companion-Seite.
 - **Welche Lizenz gilt fuer neue Arbeit?** Apache-2.0.
 
@@ -234,9 +234,9 @@ flowchart LR
 
 ---
 
-- U3. **Desktop surfaces for offline-first companion workflows**
+- U3. **MancuTG-ArenaC surfaces for offline-first workflows**
 
-**Goal:** Die ersten Companion-Oberflaechen auf den lokalen Store aufsetzen: Setup, History, Collection/Economy, Draft und Export.
+**Goal:** Die ersten MancuTG-ArenaC-Oberflaechen auf den lokalen Store aufsetzen: Setup, History, Collection/Economy, Draft und Export.
 
 **Requirements:** R1, R2, R3, R7, R8
 
@@ -280,9 +280,9 @@ flowchart LR
 
 ---
 
-- U4. **Optional backend for sync and aggregation**
+- U4. **Optional MancuTG-backend for sync and aggregation**
 
-**Goal:** Eine Serverarchitektur etablieren, die lokale Companion-Daten optional erweitert, aber nie ersetzt.
+**Goal:** Eine MancuTG-backend-Architektur etablieren, die lokale MancuTG-ArenaC-Daten optional erweitert, aber nie ersetzt.
 
 **Requirements:** R1, R4, R7
 

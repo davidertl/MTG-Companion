@@ -1,4 +1,4 @@
-use desktop_core::{bootstrap_local_companion, run_cli};
+use mancutg_arenac::{bootstrap_local_companion, run_cli};
 use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
 #[test]
@@ -7,7 +7,7 @@ fn boots_the_companion_from_a_log_file_without_backend_access() {
         .duration_since(UNIX_EPOCH)
         .expect("clock should be after unix epoch")
         .as_nanos();
-    let log_path = std::env::temp_dir().join(format!("mtg-companion-{timestamp}.log"));
+    let log_path = std::env::temp_dir().join(format!("mancutg-arenac-{timestamp}.log"));
     fs::write(
         &log_path,
         "\
@@ -39,7 +39,7 @@ fn keeps_bootstrapping_when_one_log_line_is_malformed() {
         .duration_since(UNIX_EPOCH)
         .expect("clock should be after unix epoch")
         .as_nanos();
-    let log_path = std::env::temp_dir().join(format!("mtg-companion-malformed-{timestamp}.log"));
+    let log_path = std::env::temp_dir().join(format!("mancutg-arenac-malformed-{timestamp}.log"));
     fs::write(
         &log_path,
         "\
@@ -66,7 +66,7 @@ fn exposes_bootstrap_as_a_cli_entrypoint() {
         .duration_since(UNIX_EPOCH)
         .expect("clock should be after unix epoch")
         .as_nanos();
-    let log_path = std::env::temp_dir().join(format!("mtg-companion-cli-{timestamp}.log"));
+    let log_path = std::env::temp_dir().join(format!("mancutg-arenac-cli-{timestamp}.log"));
     fs::write(
         &log_path,
         "\

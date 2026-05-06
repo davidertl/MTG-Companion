@@ -47,7 +47,7 @@ pub struct OfflineLogImportSummary {
 
 fn default_store_path() -> Result<PathBuf, String> {
     env::current_dir()
-        .map(|cwd| cwd.join("mtg-companion.sqlite3"))
+        .map(|cwd| cwd.join("mancutg-arenac.sqlite3"))
         .map_err(|error| format!("failed to determine current directory: {error}"))
 }
 
@@ -224,7 +224,7 @@ fn build_import_session_id(platform_tag: &PlatformTag, content: &str) -> String 
 }
 
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  desktop-core bootstrap <log-path>\n  desktop-core import-ios-file <log-path> [store-path]\n  desktop-core import-ios-folder <directory> [store-path]"
+    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
 }
 
 pub fn run_cli(args: &[String]) -> Result<String, String> {

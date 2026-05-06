@@ -1,15 +1,24 @@
-# Zielarchitektur: Unified MTG Companion
+# Zielarchitektur: MancuTG-Companion
 
 _Stand: 2026-05-06_
 
+## Produktterminologie
+
+- **MancuTG-Companion** - Gesamtprojekt und gemeinsame Produktfamilie
+- **MancuTG-backend** - Server- und Sync-/Integrationsschicht
+- **MancuTG-ArenaC** - Desktop-App fuer MTG Arena
+- **MancuTG-PaperC** - geplante Papierkarten-/Video-Tracking-App fuer Turniererfassung und Auswertung
+
+---
+
 ## Executive Summary
 
-Die Zielplattform ist **kein reiner Upload-Client** und ebenso **kein reiner Local-Only-Tracker**. Das passende Produktmodell ist ein **offline-first Desktop-Companion mit optionalem Backend**:
+Die Zielplattform ist **kein reiner Upload-Client** und ebenso **kein reiner Local-Only-Tracker**. Das passende Produktmodell ist ein **offline-first MancuTG-ArenaC-Desktop-Produkt mit optionalem MancuTG-backend**:
 
-- Der **Companion** ist lokal voll nutzbar und bleibt auch ohne Account oder Server sinnvoll.
-- Das **Backend** erweitert den lokalen Client um Sync, Aggregationen, geräteuebergreifende Nutzung und integrationsgetriebene Mehrwerte.
+- **MancuTG-ArenaC** ist lokal voll nutzbar und bleibt auch ohne Account oder Server sinnvoll.
+- **MancuTG-backend** erweitert MancuTG-ArenaC um Sync, Aggregationen, geraeteuebergreifende Nutzung und integrationsgetriebene Mehrwerte.
 - Die **MTG-Arena-Anbindung** erfolgt strikt ueber read-only Log Parsing.
-- **iOS/iPadOS** wird nur ueber Offline-Logimport in den Desktop-Companion eingebunden, nicht ueber Live-Erfassung.
+- **iOS/iPadOS** wird nur ueber Offline-Logimport in MancuTG-ArenaC eingebunden, nicht ueber Live-Erfassung.
 - **Archidekt** wird als echte Produktintegration eingeplant, aber so, dass sein Ausfall den Companion nicht unbrauchbar macht.
 - Neue Projektergebnisse in diesem Repo stehen unter **Apache-2.0**.
 
@@ -33,17 +42,17 @@ Die App soll die heute fragmentierten Tracker-Funktionen in einem Produkt verein
 
 ### Bewusste Abgrenzung
 
-Die Plattform ist **nicht** als servicezentrierter Thin Client geplant. Der Server soll Zusatznutzen liefern, aber nicht die lokale Kernfunktionalitaet besitzen. Das verhindert dieselbe strukturelle Schwaeche wie bei historischen Tracker-Apps, deren Desktop-Client ohne Backend kaum noch Wert hatte.
+Die Plattform ist **nicht** als servicezentrierter Thin Client geplant. MancuTG-backend soll Zusatznutzen liefern, aber nicht die lokale Kernfunktionalitaet von MancuTG-ArenaC besitzen. Das verhindert dieselbe strukturelle Schwaeche wie bei historischen Tracker-Apps, deren Desktop-Client ohne Backend kaum noch Wert hatte.
 
 ---
 
 ## Nicht verhandelbare Produktentscheidungen
 
-1. **Backend vorhanden, aber nicht verpflichtend**
-   - Ein Nutzer kann den Desktop-Companion ohne Account installieren und verwenden.
+1. **MancuTG-backend vorhanden, aber nicht verpflichtend**
+   - Ein Nutzer kann MancuTG-ArenaC ohne Account installieren und verwenden.
    - Cloud-Sync, Multi-Device-Historie, Share-Links, Team- oder Coach-Funktionen bleiben optionale Serverdienste.
 
-2. **Offline-first Companion**
+2. **Offline-first MancuTG-ArenaC**
    - Log Parsing, lokale Speicherung, Overlay, History, Replay-Grundlage und Exporte funktionieren ohne Backend.
    - Wenn das Backend nicht erreichbar ist, bleibt der Client funktionsfaehig; nur serverabhaengige Features werden sauber deaktiviert.
 
@@ -54,10 +63,11 @@ Die Plattform ist **nicht** als servicezentrierter Thin Client geplant. Der Serv
    - Keine Spielmanipulation
 
 4. **iOS/iPadOS nur als Offline-Importpfad**
-   - Der Desktop-Client darf exportierte MTG-Arena-Logs von iPhone/iPad importieren.
+   - MancuTG-ArenaC darf exportierte MTG-Arena-Logs von iPhone/iPad importieren.
    - Unterstuetzt werden Drag & Drop von `.log`-Dateien, Ordnerimport und wiederholte Importe mit Deduplizierung.
    - Nicht Teil der Zielarchitektur sind Live-Tracking, Overlay, Packet Capture, Jailbreak-Zugriff, Memory Inspection oder direkter Cross-App-Sandbox-Zugriff.
    - Eine spaetere iOS-App ist nur als Viewer-, Sync- oder Import-Helper einzuordnen.
+   - **MancuTG-PaperC** ist eine separate Produktlinie fuer Papierkarten-/Video-Tracking und kein Alias fuer die Arena-App.
 
 5. **Archidekt als Produktintegration**
    - Archidekt wird nicht als spaeteres Nice-to-have behandelt.
@@ -126,7 +136,7 @@ flowchart LR
     E --> K[Lokale Exportfunktion]
 
     D --> L[Sync Outbox]
-    L --> M[Optionales Backend]
+    L --> M[MancuTG-backend]
     M --> N[(Server-Datenbank)]
     M --> O[Aggregationen / Web-Features]
     M --> P[Archidekt-Connector]
@@ -139,12 +149,12 @@ flowchart LR
 
 | Ebene | Verantwortung | Muss offline funktionieren? |
 |---|---|---|
-| Desktop Companion | Log-Watching, Parser, lokaler Store, Overlay, History, Exporte, lokale Deck- und Matchansichten, iOS-Offline-Import | Ja |
-| Optionales Backend | Auth, Sync, Konfliktaufloesung, geraeteuebergreifende Daten, Sharing, Aggregationen | Nein |
+| MancuTG-ArenaC | Log-Watching, Parser, lokaler Store, Overlay, History, Exporte, lokale Deck- und Matchansichten, iOS-Offline-Import | Ja |
+| MancuTG-backend | Auth, Sync, Konfliktaufloesung, geraeteuebergreifende Daten, Sharing, Aggregationen | Nein |
 | Integrationsdienste | Archidekt-Import, spaetere Web- oder Datenquellen | Nein |
 | Card-Data Pipeline | Scryfall-/MTGJSON-Snapshots, lokale Caches, Server-Seed-Daten | Teilweise |
 
-### Desktop-Companion
+### MancuTG-ArenaC
 
 Empfohlener Stack:
 
@@ -159,7 +169,7 @@ Begruendung:
 - Tauri reduziert die Desktop-Runtime-Kosten gegenueber Electron, ohne den Web-UI-Ansatz aufzugeben.
 - Die Overlay-Schicht sollte aber hinter einer separaten Boundary liegen, damit bei platform-spezifischer Reibung ein Shell-Wechsel oder ein natives Overlay-Modul moeglich bleibt.
 
-### Optionales Backend
+### MancuTG-backend
 
 Empfohlene Verantwortung:
 
@@ -188,7 +198,7 @@ Das Backend darf **nicht** Voraussetzung fuer folgende Faehigkeiten sein:
 
 iPhone- und iPad-Unterstuetzung ist fuer diese Produktlinie **Import-zentriert**, nicht live:
 
-- Der Desktop-Client importiert exportierte MTG-Arena-Logdateien von iOS/iPadOS.
+- MancuTG-ArenaC importiert exportierte MTG-Arena-Logdateien von iOS/iPadOS.
 - Der Import ist lokal und offline-first.
 - Die App verlangt **nicht** iTunes speziell; auf Windows wird **Apple Devices** genannt, auf macOS **Finder**, wenn die MTG-Arena-Dateien dort sichtbar sind.
 - Wenn MTG Arena in Apple Devices/Finder nicht sichtbar ist, darf die Hilfe auf Drittanbieter-Dateiuebertragungs-Tools verweisen, solange diese nur den Dateiexport ermoeglichen.
@@ -211,7 +221,7 @@ iPhone- und iPad-Unterstuetzung ist fuer diese Produktlinie **Import-zentriert**
 
 ### Zukuenftige iOS-App
 
-Falls spaeter eine iOS-App entsteht, ist sie in dieser Architektur als **Viewer-, Sync- oder Import-Helper** zu behandeln. Sie ist nicht der Ort fuer invasive Tracking-Techniken oder fuer Desktop-paritaetes Live-Overlay.
+Falls spaeter eine iOS-App entsteht, ist sie in dieser Architektur als **Viewer-, Sync- oder Import-Helper** zu behandeln. Sie ist nicht der Ort fuer invasive Tracking-Techniken oder fuer MancuTG-ArenaC-paritaetes Live-Overlay.
 
 ---
 
@@ -233,7 +243,7 @@ Der Kern folgt einem append-only Event-Modell mit abgeleiteten Projektionen:
 | `sync_state` | Dirty-Tracking fuer optionale Server-Sync |
 | `integration_snapshot` | importierte Fremddaten, z. B. Archidekt-Decks |
 
-Wichtig ist, dass **lokale Daten autoritativ fuer den Companion bleiben**. Der Server repliziert oder erweitert, ersetzt aber nicht das lokale System of Record fuer den Einzelclient.
+Wichtig ist, dass **lokale Daten autoritativ fuer MancuTG-ArenaC bleiben**. MancuTG-backend repliziert oder erweitert, ersetzt aber nicht das lokale System of Record fuer den Einzelclient.
 
 ---
 
@@ -265,9 +275,9 @@ So vermeiden wir, dass der Desktop-Client fuer einen einzelnen Integrationsfall 
 
 ### Offline-Verhalten
 
-Die Archidekt-Integration ist **wertvoll, aber nicht load-bearing**:
+Die Archidekt-Integration ist **wertvoll, aber nicht load-bearing** fuer MancuTG-ArenaC:
 
-- Ohne Internet oder ohne Backend bleibt der Companion funktionsfaehig.
+- Ohne Internet oder ohne MancuTG-backend bleibt MancuTG-ArenaC funktionsfaehig.
 - Bereits importierte Archidekt-Decks bleiben lokal als Snapshot erhalten.
 - Live-Refresh von Archidekt ist dann einfach nicht verfuegbar.
 
@@ -361,6 +371,6 @@ Konsequenzen:
 
 Die richtige Zielarchitektur fuer dieses Projekt lautet:
 
-> **Ein lokaler Desktop-Companion mit eigenem Event-Store und optionalem Backend fuer Sync, Aggregationen und Integrationen; Archidekt wird ueber einen separaten Connector auf Basis von `pyrchidekt` eingebunden; der gesamte neue Stack wird als Apache-2.0-Clean-room aufgebaut.**
+> **MancuTG-Companion besteht aus MancuTG-ArenaC als lokalem Desktop-Produkt mit eigenem Event-Store und MancuTG-backend als optionaler Sync-/Aggregations-/Integrationsschicht; Archidekt wird ueber einen separaten Connector auf Basis von `pyrchidekt` eingebunden; der gesamte neue Stack wird als Apache-2.0-Clean-room aufgebaut.**
 
 Diese Entscheidung balanciert Produktnutzen, Wartbarkeit, Rechtsrisiko und Zukunftsfaehigkeit besser als entweder ein reiner Uploader oder ein rein lokaler Tracker ohne Erweiterungsschicht.

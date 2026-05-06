@@ -54,7 +54,7 @@ export function getSetupBanner(input: SetupStateInput): string {
     return "Bitte den gefundenen Log-Pfad bestaetigen, damit der Companion lokal lesen kann.";
   }
 
-  return "Der lokale Companion ist bereit und kann ohne Konto starten.";
+  return "MancuTG-ArenaC ist lokal bereit und kann ohne Konto starten.";
 }
 
 export function getIosOfflineImportMethods(): OfflineImportMethod[] {
@@ -62,7 +62,7 @@ export function getIosOfflineImportMethods(): OfflineImportMethod[] {
     {
       id: "drag-and-drop",
       label: "Drag & Drop von .log-Dateien",
-      description: "Exportierte MTG Arena iOS Logs direkt in den Desktop-Companion ziehen.",
+      description: "Exportierte MTG Arena iOS Logs direkt in MancuTG-ArenaC ziehen.",
       accepts: [".log"],
       platformTag: "ios",
     },

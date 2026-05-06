@@ -94,18 +94,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "desktop-core"
-version = "0.1.0"
-dependencies = [
- "core-domain",
- "core-parser",
- "core-store",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -199,6 +187,18 @@ dependencies = [
  "cc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "mancutg-arenac"
+version = "0.1.0"
+dependencies = [
+ "core-domain",
+ "core-parser",
+ "core-store",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

@@ -1,10 +1,10 @@
 {
-  "name": "mtg-companion",
+  "name": "mancutg-companion",
   "private": true,
   "type": "module",
   "scripts": {
     "api:start": "node --experimental-strip-types services/api/src/main.ts",
-    "desktop:help": "cargo run -p desktop-core -- --help",
+    "desktop:help": "cargo run -p mancutg-arenac -- --help",
     "typecheck": "tsc --noEmit",
     "test:ts": "vitest run",
     "test:rust": "cargo test --workspace",

@@ -1,15 +1,15 @@
 ---
-title: feat: Close the foundation-to-functional gap
+title: feat: Close the MancuTG foundation-to-functional gap
 type: feat
 status: completed
 date: 2026-05-06
 ---
 
-# feat: Close the foundation-to-functional gap
+# feat: Close the MancuTG foundation-to-functional gap
 
 ## Summary
 
-Dieses Dokument gleicht den bestehenden Foundations-Plan mit dem echten Repo-Zustand ab und beschreibt die verbleibenden Luecken zwischen "saubere Grundstruktur" und "tatsaechlich benutzbarer Produktflaeche". Der Fokus liegt darauf, die bereits gebauten Kernmodule ueber benutzbare End-to-End-Pfade zusammenzufuehren: Desktop-Import/Reporting, Import-Center-State und einen startbaren API-Server.
+Dieses Dokument gleicht den bestehenden Foundations-Plan mit dem echten Repo-Zustand ab und beschreibt die verbleibenden Luecken zwischen "saubere Grundstruktur" und "tatsaechlich benutzbarer Produktflaeche". Der Fokus liegt darauf, die bereits gebauten Kernmodule ueber benutzbare End-to-End-Pfade zusammenzufuehren: MancuTG-ArenaC-Import/Reporting, einen Import-Center-State und einen startbaren MancuTG-backend-Server.
 
 ---
 
@@ -56,8 +56,8 @@ Der bisherige Plan ist als Foundations-Plan korrekt abgeschlossen: Parser, Store
 
 - R1. Der bestehende Foundations-Stand muss gegen den aktuellen Codezustand explizit auditiert und dokumentiert werden.
 - R2. Bereits funktionierende Faehigkeiten muessen klar von vorbereiteten, aber noch nicht benutzbaren Flaechen getrennt werden.
-- R3. Der Desktop muss einen benutzbaren End-to-End-Einstiegspunkt fuer lokale Bootstrap- und iOS-Offline-Importfluesse erhalten.
-- R4. Der API-Teil muss als startbarer HTTP-Server verfuegbar sein, nicht nur als interne Funktionslogik.
+- R3. MancuTG-ArenaC muss einen benutzbaren End-to-End-Einstiegspunkt fuer lokale Bootstrap- und iOS-Offline-Importfluesse erhalten.
+- R4. MancuTG-backend muss als startbarer HTTP-Server verfuegbar sein, nicht nur als interne Funktionslogik.
 - R5. Die Desktop-Schicht muss einen ausdruecklichen Import-Center-/Import-Report-State fuer Offline-Importe erhalten.
 - R6. Die neue Funktionalisierung darf die bisherigen Offline-first-, read-only- und Apache-2.0-Invarianten nicht verletzen.
 
@@ -81,8 +81,8 @@ Der bisherige Plan ist als Foundations-Plan korrekt abgeschlossen: Parser, Store
 ## Key Technical Decisions
 
 - **Audit und Umsetzung im selben Zug:** Der Plan dokumentiert nicht nur Gaps, sondern schliesst die hoechstwertigen funktionalen Luecken direkt.
-- **Rust-CLI fuer Desktop-Kern:** Statt auf eine noch nicht vorhandene Tauri-GUI zu warten, bekommt der Desktop-Kern einen expliziten Einstiegspunkt fuer Bootstrap- und iOS-Import-Workflows.
-- **HTTP-Server ueber vorhandene API-Routen:** Die bestehende Typ- und Vertragslogik wird ueber einen kleinen startbaren Server exponiert, statt ein neues Backend parallel zu erfinden.
+- **Rust-CLI fuer MancuTG-ArenaC:** Statt auf eine noch nicht vorhandene Tauri-GUI zu warten, bekommt MancuTG-ArenaC einen expliziten Einstiegspunkt fuer Bootstrap- und iOS-Import-Workflows.
+- **HTTP-Server fuer MancuTG-backend ueber vorhandene API-Routen:** Die bestehende Typ- und Vertragslogik wird ueber einen kleinen startbaren Server exponiert, statt ein neues Backend parallel zu erfinden.
 - **Import-Center als zustandsorientierte Desktop-Schicht:** Die TypeScript-Desktop-Layer bekommt einen konkreten Import-Center-State statt nur einzelner Guidance-Helfer.
 
 ---

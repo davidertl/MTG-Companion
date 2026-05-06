@@ -1,4 +1,4 @@
-use desktop_core::run_cli;
+use mancutg_arenac::run_cli;
 use std::{
     fs,
     time::{SystemTime, UNIX_EPOCH},
@@ -9,7 +9,7 @@ fn temp_path(name: &str) -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock should be after unix epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("mtg-companion-cli-{timestamp}-{name}"))
+    std::env::temp_dir().join(format!("mancutg-arenac-cli-{timestamp}-{name}"))
 }
 
 #[test]

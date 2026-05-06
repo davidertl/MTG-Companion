@@ -1,6 +1,13 @@
-# MTG-Companion
+# MancuTG-Companion
 
-Ein einheitlicher, offline-tauglicher Companion fuer MTG Arena mit optionalem Backend fuer Sync, Aggregationen und plattformuebergreifende Erweiterungen.
+Ein einheitliches, offline-taugliches Companion-Projekt fuer MTG Arena mit optionalem Backend fuer Sync, Aggregationen und plattformuebergreifende Erweiterungen.
+
+## Einheitliche Produktterminologie
+
+- **MancuTG-Companion** - Gesamtprojekt
+- **MancuTG-backend** - Server / Backend-Service
+- **MancuTG-ArenaC** - Desktop-App fuer MTG Arena
+- **MancuTG-PaperC** - zukuenftige Papierkarten-Video-Tracking-App fuer Turniererfassung und Auswertung
 
 ## Produktthese
 
@@ -16,7 +23,7 @@ Dieses Repository definiert die Zielarchitektur fuer eine neue App, die diese Fa
 
 ## Festgelegte Produktentscheidungen
 
-- **Backend vorhanden, aber nicht verpflichtend:** Der Desktop-Companion bleibt lokal nuetzlich, auch ohne Account oder laufenden Server.
+- **Backend vorhanden, aber nicht verpflichtend:** MancuTG-ArenaC bleibt lokal nuetzlich, auch ohne Account oder laufenden MancuTG-backend.
 - **Offline-first:** Parsing, lokaler Event-Store, Overlay, Match-History und Exporte funktionieren ohne Cloud.
 - **Log-only Integration:** MTG Arena wird ausschliesslich ueber read-only Log Parsing angebunden.
 - **Archidekt eingebunden:** Deck-Import und spaetere Sync-Flows werden ueber einen dedizierten Archidekt-Connector modelliert.
@@ -32,7 +39,7 @@ Dieses Repository definiert die Zielarchitektur fuer eine neue App, die diese Fa
 
 ## Architektur in einem Satz
 
-Der Companion ist ein lokaler Desktop-Client mit eigenem Event-Store; ein optionales Backend uebernimmt Sync, konto-basierte Mehrgeraete-Funktionen, aggregierte Analytics und Integrationen wie Archidekt, ohne den Kernnutzen des Clients davon abhaengig zu machen.
+MancuTG-ArenaC ist ein lokaler Desktop-Client mit eigenem Event-Store; MancuTG-backend uebernimmt optional Sync, konto-basierte Mehrgeraete-Funktionen, aggregierte Analytics und Integrationen wie Archidekt, ohne den Kernnutzen des Clients davon abhaengig zu machen.
 
 ## Implementierter Stand
 
@@ -43,14 +50,14 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - `crates/core-parser` - log-only Parser fuer normalisierte Events und Unknown-Event-Capture
   - `crates/core-store` - SQLite-basierter lokaler Event-Store und Projektionen
   - `crates/core-sync` - Outbox-/Sync-Objekte fuer optionale Backend-Synchronisation
-- **Desktop-Kern**
+- **MancuTG-ArenaC-Kern**
   - `apps/desktop/src-tauri` - Offline-Bootstrap ueber Parser + Event-Store
   - `apps/desktop/src` - route-nahe Query-, Export-, Privacy-, Setup- und Deck-Cache-Logik
   - inklusive iOS/iPadOS-Offline-Importflow fuer `.log`-Dateien per Drag & Drop oder Ordnerimport
-- **Backend-Grundlage**
+- **MancuTG-backend-Grundlage**
   - `services/api/src` - optionale Sync-, Auth-, Archidekt-Import- und Telemetry-Services
   - `services/worker/src` - Hintergrundjob-Grundlage fuer serverseitige Verarbeitungsaufgaben
-- **Archidekt-Connector**
+- **Archidekt-Connector fuer MancuTG-backend**
   - `services/archidekt-connector/src/connector.py` - read-only Import ueber `pyrchidekt`-kompatiblen Adapter
 - **Gemeinsame Vertrage**
   - `packages/shared-schema/src` - zod-validierte Schemas fuer Sync-, Privacy- und Deck-Snapshots
@@ -105,7 +112,7 @@ Das fuehrt aus:
 
 ### Benutzbare Foundations-Einstiegspunkte
 
-#### Desktop-Kern als CLI
+#### MancuTG-ArenaC als CLI
 
 Usage anzeigen:
 
@@ -116,22 +123,22 @@ npm run desktop:help
 Lokales Log bootstrapen:
 
 ```bash
-cargo run -p desktop-core -- bootstrap "/pfad/zur/Player.log"
+cargo run -p mancutg-arenac -- bootstrap "/pfad/zur/Player.log"
 ```
 
 Einzelne exportierte iOS-Logdatei importieren:
 
 ```bash
-cargo run -p desktop-core -- import-ios-file "/pfad/zur/exportierten.log" "/pfad/zur/mtg-companion.sqlite3"
+cargo run -p mancutg-arenac -- import-ios-file "/pfad/zur/exportierten.log" "/pfad/zur/mancutg-arenac.sqlite3"
 ```
 
 Einen Ordner mit exportierten iOS-Logs importieren:
 
 ```bash
-cargo run -p desktop-core -- import-ios-folder "/pfad/zum/export-ordner" "/pfad/zur/mtg-companion.sqlite3"
+cargo run -p mancutg-arenac -- import-ios-folder "/pfad/zum/export-ordner" "/pfad/zur/mancutg-arenac.sqlite3"
 ```
 
-#### Optionaler API-Server
+#### MancuTG-backend lokal starten
 
 Den Foundations-API-Server lokal starten:
 
@@ -150,11 +157,12 @@ Verfuegbare Endpunkte:
 ### Bereits funktional
 
 - Rust-Parser, lokaler SQLite-Store und Projektionen
-- degradierbares Desktop-Bootstrap aus lokalen Logs
+- degradierbares MancuTG-ArenaC-Bootstrap aus lokalen Logs
 - iOS/iPadOS-Offline-Import mit Deduplizierung und `ios`-Tagging
-- TypeScript-Desktop-State fuer Setup, History, Collection, Draft, Privacy und Import-Center
-- startbarer API-Server fuer Health, Sync und Archidekt-Import
+- TypeScript-Desktop-State fuer Setup, History, Collection, Draft, Privacy und Import-Center in MancuTG-ArenaC
+- startbarer MancuTG-backend-Server fuer Health, Sync und Archidekt-Import
 - read-only Archidekt-Connector in Python
+- MancuTG-PaperC ist als eigenstaendiger Produktname reserviert, aber noch nicht implementiert
 
 ### Noch nicht als vollstaendiges Produkt umgesetzt
 
@@ -166,12 +174,13 @@ Verfuegbare Endpunkte:
 
 ## Aktuelle Produktinvarianten
 
-- Der Companion bleibt **ohne Account** und **ohne laufendes Backend** lokal nutzbar.
+- MancuTG-ArenaC bleibt **ohne Account** und **ohne laufenden MancuTG-backend** lokal nutzbar.
 - Arena wird ausschliesslich ueber **read-only Log Parsing** eingebunden.
 - Sync, Telemetrie und Archidekt sind **optional** und durch Privacy-/Mode-Logik gated.
 - iOS/iPadOS-Tracking ist **nur per Offline-Logimport** unterstuetzt; kein Live-Tracking, Overlay oder Sandbox-Zugriff auf dem Geraet.
-- Der Desktop-Companion unterstuetzt exportierte iOS-Logs per **Drag & Drop** und **Ordnerimport** mit Deduplizierung und `ios`-Plattformtagging.
+- MancuTG-ArenaC unterstuetzt exportierte iOS-Logs per **Drag & Drop** und **Ordnerimport** mit Deduplizierung und `ios`-Plattformtagging.
 - Der Exportweg fuer iOS-Logs setzt **nicht iTunes voraus**; Apple Devices (Windows), Finder (macOS) und notfalls Drittanbieter-Dateiwerkzeuge werden als Guidance modelliert.
-- Archidekt ist in der ersten Stufe **read-only** und wird serverseitig ueber einen Connector isoliert.
+- Archidekt ist in der ersten Stufe **read-only** und wird serverseitig ueber MancuTG-backend isoliert.
 - Eine spaetere iOS-App wird nur als **Viewer/Sync/Import-Helper** betrachtet, nicht als Live-Tracker.
+- MancuTG-PaperC ist die reservierte Bezeichnung fuer die separate Papierkarten-Video-Tracking-App.
 - Neue Arbeit in diesem Repository bleibt **Apache-2.0-kompatibel**.

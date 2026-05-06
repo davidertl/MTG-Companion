@@ -1,9 +1,9 @@
-# Privacy and data flow
+# MancuTG-Companion privacy and data flow
 
 ## Local-first default
 
-The companion is designed so that the default user journey does not require an account
-or a running backend.
+MancuTG-Companion is designed so that the default user journey does not require an
+account or a running MancuTG-backend.
 
 Local-only capabilities:
 
@@ -26,15 +26,15 @@ Outbound traffic is intentionally small and purpose-gated.
 | `telemetry` | disabled | user explicitly opts in to telemetry |
 | `archidekt` | disabled | user explicitly enables sync/integration features |
 
-## Backend boundary
+## MancuTG-backend boundary
 
-The backend is additive only. It may receive:
+MancuTG-backend is additive only. It may receive:
 
 - sync objects produced from local entities
 - validated Archidekt import payloads
 - opt-in telemetry events
 
-The backend must not be required for:
+MancuTG-backend must not be required for:
 
 - local log parsing
 - iOS/iPadOS offline log import
@@ -61,4 +61,4 @@ Archidekt imports are treated as a read-only integration:
 - no jailbreak-only access path
 - no direct cross-app sandbox access on iOS/iPadOS
 - no required telemetry
-- no mandatory account for local companion workflows
+- no mandatory account for local MancuTG-ArenaC workflows
