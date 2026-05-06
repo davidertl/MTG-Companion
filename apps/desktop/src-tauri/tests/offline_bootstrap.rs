@@ -1,4 +1,4 @@
-use desktop_core::bootstrap_local_companion;
+use desktop_core::{bootstrap_local_companion, run_cli};
 use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
 #[test]
@@ -56,6 +56,36 @@ fn keeps_bootstrapping_when_one_log_line_is_malformed() {
     assert_eq!(bootstrap.match_history.len(), 1);
     assert_eq!(bootstrap.collection_snapshot.map(|snapshot| snapshot.cards_owned), Some(711));
     assert_eq!(bootstrap.parse_warnings.len(), 1);
+
+    fs::remove_file(log_path).expect("temporary log file should be removable");
+}
+
+#[test]
+fn exposes_bootstrap_as_a_cli_entrypoint() {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock should be after unix epoch")
+        .as_nanos();
+    let log_path = std::env::temp_dir().join(format!("mtg-companion-cli-{timestamp}.log"));
+    fs::write(
+        &log_path,
+        "\
+2026-05-06T21:00:00Z|MATCH_START|match_id=cli-match-1|deck=Mono Red|queue=play
+2026-05-06T21:05:00Z|INVENTORY_SNAPSHOT|gold=2200|gems=150|wildcards=9|vault=5
+",
+    )
+    .expect("log file should be written");
+
+    let output = run_cli(&[
+        "bootstrap".to_owned(),
+        log_path.to_string_lossy().into_owned(),
+    ])
+    .expect("CLI bootstrap should succeed");
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&output).expect("CLI bootstrap should return valid JSON");
+    assert_eq!(parsed["matchHistory"][0]["deck"], "Mono Red");
+    assert_eq!(parsed["inventorySnapshot"]["gold"], 2200);
 
     fs::remove_file(log_path).expect("temporary log file should be removable");
 }

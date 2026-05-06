@@ -32,4 +32,5 @@ export type DeckSnapshot = z.infer<typeof deckSnapshotSchema>;
 export type SyncObject = z.infer<typeof syncObjectSchema>;
 export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;
 
+export * from "./imports";
 export * from "./privacy";

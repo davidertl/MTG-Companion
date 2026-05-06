@@ -8,4 +8,6 @@ license.workspace = true
 core-parser = { path = "../../../crates/core-parser" }
 core-store = { path = "../../../crates/core-store" }
 core-domain = { path = "../../../crates/core-domain" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 sha2 = "0.10.9"

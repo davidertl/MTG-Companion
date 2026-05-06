@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "api:start": "node --experimental-strip-types services/api/src/main.ts",
+    "desktop:help": "cargo run -p desktop-core -- --help",
     "typecheck": "tsc --noEmit",
     "test:ts": "vitest run",
     "test:rust": "cargo test --workspace",

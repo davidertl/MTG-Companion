@@ -103,6 +103,67 @@ Das fuehrt aus:
 - `npm run test:rust`
 - `npm run test:python`
 
+### Benutzbare Foundations-Einstiegspunkte
+
+#### Desktop-Kern als CLI
+
+Usage anzeigen:
+
+```bash
+npm run desktop:help
+```
+
+Lokales Log bootstrapen:
+
+```bash
+cargo run -p desktop-core -- bootstrap "/pfad/zur/Player.log"
+```
+
+Einzelne exportierte iOS-Logdatei importieren:
+
+```bash
+cargo run -p desktop-core -- import-ios-file "/pfad/zur/exportierten.log" "/pfad/zur/mtg-companion.sqlite3"
+```
+
+Einen Ordner mit exportierten iOS-Logs importieren:
+
+```bash
+cargo run -p desktop-core -- import-ios-folder "/pfad/zum/export-ordner" "/pfad/zur/mtg-companion.sqlite3"
+```
+
+#### Optionaler API-Server
+
+Den Foundations-API-Server lokal starten:
+
+```bash
+npm run api:start
+```
+
+Verfuegbare Endpunkte:
+
+- `GET /health`
+- `POST /sync`
+- `GET /integrations/archidekt/:deckId`
+
+## Audit des aktuellen Zustands
+
+### Bereits funktional
+
+- Rust-Parser, lokaler SQLite-Store und Projektionen
+- degradierbares Desktop-Bootstrap aus lokalen Logs
+- iOS/iPadOS-Offline-Import mit Deduplizierung und `ios`-Tagging
+- TypeScript-Desktop-State fuer Setup, History, Collection, Draft, Privacy und Import-Center
+- startbarer API-Server fuer Health, Sync und Archidekt-Import
+- read-only Archidekt-Connector in Python
+
+### Noch nicht als vollstaendiges Produkt umgesetzt
+
+- echte Tauri-/React-Oberflaeche
+- Overlay/HUD
+- Replay-/Timeline-Viewer
+- persistentes Multi-User-/Auth-Backend
+- Web-Profile, Sharing und Team-Funktionen
+
 ## Aktuelle Produktinvarianten
 
 - Der Companion bleibt **ohne Account** und **ohne laufendes Backend** lokal nutzbar.

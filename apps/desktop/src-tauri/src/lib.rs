@@ -4,14 +4,17 @@ use core_domain::{
 };
 use core_parser::parse_log_lossy;
 use core_store::EventStore;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
+    env,
     fs,
     path::{Path, PathBuf},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopBootstrap {
     pub match_history: Vec<MatchRecord>,
     pub collection_snapshot: Option<CollectionSnapshot>,
@@ -28,7 +31,8 @@ pub struct OfflineLogImportRequest {
     pub roots: Vec<PathBuf>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OfflineLogImportSummary {
     pub platform_tag: PlatformTag,
     pub source_kind: ImportSourceKind,
@@ -39,6 +43,20 @@ pub struct OfflineLogImportSummary {
     pub inserted_events: usize,
     pub imported_paths: Vec<String>,
     pub parse_warnings: Vec<String>,
+}
+
+fn default_store_path() -> Result<PathBuf, String> {
+    env::current_dir()
+        .map(|cwd| cwd.join("mtg-companion.sqlite3"))
+        .map_err(|error| format!("failed to determine current directory: {error}"))
+}
+
+fn open_store(optional_store_path: Option<&str>) -> Result<EventStore, String> {
+    let store_path = match optional_store_path {
+        Some(path) => PathBuf::from(path),
+        None => default_store_path()?,
+    };
+    EventStore::open(&store_path).map_err(|error| format!("failed to open store {}: {error}", store_path.display()))
 }
 
 pub fn bootstrap_local_companion(
@@ -203,4 +221,47 @@ fn build_import_session_id(platform_tag: &PlatformTag, content: &str) -> String 
     let mut hasher = Sha256::new();
     hasher.update(content.as_bytes());
     format!("{}-{:x}", platform_tag.label(), hasher.finalize())
+}
+
+pub fn cli_usage() -> &'static str {
+    "Usage:\n  desktop-core bootstrap <log-path>\n  desktop-core import-ios-file <log-path> [store-path]\n  desktop-core import-ios-folder <directory> [store-path]"
+}
+
+pub fn run_cli(args: &[String]) -> Result<String, String> {
+    let Some(command) = args.first().map(String::as_str) else {
+        return Ok(cli_usage().to_owned());
+    };
+
+    match command {
+        "--help" | "-h" | "help" => Ok(cli_usage().to_owned()),
+        "bootstrap" => {
+            let log_path = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
+            let result = bootstrap_local_companion("desktop-bootstrap", log_path)?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize bootstrap result: {error}"))
+        }
+        "import-ios-file" => {
+            let log_path = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
+            let store = open_store(args.get(2).map(String::as_str))?;
+            let result = import_ios_logs(
+                &store,
+                ImportSourceKind::DragAndDrop,
+                vec![PathBuf::from(log_path)],
+            )?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize import result: {error}"))
+        }
+        "import-ios-folder" => {
+            let directory = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
+            let store = open_store(args.get(2).map(String::as_str))?;
+            let result = import_ios_logs(
+                &store,
+                ImportSourceKind::FolderImport,
+                vec![PathBuf::from(directory)],
+            )?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize import result: {error}"))
+        }
+        _ => Err(cli_usage().to_owned()),
+    }
 }

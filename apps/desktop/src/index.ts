@@ -6,6 +6,7 @@ export * from "./routes/collection/index";
 export * from "./routes/decks/index";
 export * from "./routes/draft/index";
 export * from "./routes/history/index";
+export * from "./routes/imports/index";
 export * from "./routes/privacy/index";
 export * from "./routes/settings/index";
 export * from "./routes/setup/index";

@@ -5,6 +5,7 @@ import {
   buildDecksRouteState,
   buildDraftRouteState,
   buildHistoryRouteState,
+  buildImportCenterState,
   buildPrivacyRouteState,
   buildSettingsState,
   getSetupBanner,
@@ -23,6 +24,7 @@ describe("desktop shell exports", () => {
     expect(buildDraftRouteState([]).empty).toBe(true);
     expect(buildSettingsState(privacy).offlineCapable).toBe(true);
     expect(buildDecksRouteState([]).empty).toBe(true);
+    expect(buildImportCenterState().availableMethods).toHaveLength(2);
     expect(buildPrivacyRouteState(privacy).modeLabel).toBe("Offline-only mode");
   });
 });

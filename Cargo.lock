@@ -100,6 +100,8 @@ dependencies = [
  "core-domain",
  "core-parser",
  "core-store",
+ "serde",
+ "serde_json",
  "sha2",
 ]
 
