@@ -16,7 +16,10 @@ describe("api server", () => {
 
     const health = await fetch(`${address}/health`);
     expect(health.status).toBe(200);
-    await expect(health.json()).resolves.toEqual({ status: "ok" });
+    await expect(health.json()).resolves.toMatchObject({
+      status: "ok",
+      storage: expect.any(String),
+    });
 
     const sync = await fetch(`${address}/sync`, {
       method: "POST",

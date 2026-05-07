@@ -12,12 +12,22 @@ import {
   type ArchidektFetcher,
 } from "./routes/integrations/archidekt/import.ts";
 import { eventsRoute } from "./routes/events.ts";
+import { ingestBatchesRoute } from "./routes/ingest/batches.ts";
+import { eventRoute } from "./routes/read/events.ts";
+import { gamesRoute } from "./routes/read/games.ts";
+import { createLiveHub, type LiveHub } from "./routes/read/live.ts";
+import { overviewRoute } from "./routes/read/overview.ts";
+import { resolveReviewRoute, reviewQueueRoute } from "./routes/read/reviewQueue.ts";
+import { sessionEventsRoute, sessionRoute, sessionsRoute } from "./routes/read/sessions.ts";
 import { syncRoute } from "./routes/sync.ts";
+import { SqliteClient } from "./storage/sqlite/client.ts";
 
 export interface ApiServerOptions {
   store?: SyncStore;
   eventStore?: EventStore;
   archidektFetcher?: ArchidektFetcher;
+  sqlite?: SqliteClient;
+  liveHub?: LiveHub;
 }
 
 export interface StartedApiServer {
@@ -30,6 +40,8 @@ export interface StartedApiServer {
 export function createApiServer(options: ApiServerOptions = {}): Server {
   const store = options.store ?? createInMemorySyncStore();
   const eventStore = options.eventStore ?? createInMemoryEventStore();
+  const sqlite = options.sqlite;
+  const liveHub = options.liveHub ?? createLiveHub();
   const importDeck = buildArchidektImportRoute(
     options.archidektFetcher ?? buildRuntimeArchidektFetcher(),
   );
@@ -38,9 +50,15 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
     try {
       const method = request.method ?? "GET";
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      if (method === "OPTIONS") {
+        return handleCorsPreflight(request, response);
+      }
+      if (!applyCorsHeaders(request, response)) {
+        return sendJson(response, 403, { error: "cors-origin-denied" });
+      }
 
       if (method === "GET" && url.pathname === "/health") {
-        return sendJson(response, 200, { status: "ok" });
+        return sendJson(response, 200, { status: "ok", storage: sqlite ? "sqlite" : "memory" });
       }
 
       if (method === "POST" && url.pathname === "/sync") {
@@ -59,10 +77,96 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
         return sendJson(response, 200, result);
       }
 
+      if (sqlite && method === "POST" && url.pathname === "/v1/ingest/batches") {
+        const body = await readJsonBody(request);
+        const result = ingestBatchesRoute(body, sqlite);
+        if (result.status === 200) {
+          liveHub.publish({ type: "ingest.accepted", payload: result.payload });
+        }
+        return sendJson(response, result.status, result.payload);
+      }
+
+      if (method === "POST" && url.pathname === "/v1/ingest/raw-log") {
+        if (process.env.MANCUTG_ENABLE_RAW_LOG_INGEST !== "true") {
+          return sendJson(response, 403, { error: "raw-log-upload-disabled" });
+        }
+        return sendJson(response, 501, { error: "raw-log-upload-not-implemented" });
+      }
+
       if (method === "POST" && url.pathname === "/media/sessions") {
         const body = await readJsonBody(request);
         const result = mediaSessionsRoute(body, eventStore);
         return sendJson(response, 200, result);
+      }
+
+      if (sqlite && method === "GET" && url.pathname === "/v1/live") {
+        const unsubscribe = liveHub.subscribe(response);
+        request.on("close", unsubscribe);
+        return;
+      }
+
+      if (sqlite && method === "GET" && url.pathname === "/v1/overview") {
+        return sendJson(response, 200, overviewRoute(sqlite));
+      }
+
+      if (sqlite && method === "GET" && url.pathname === "/v1/games") {
+        return sendJson(response, 200, gamesRoute(sqlite));
+      }
+
+      if (sqlite && method === "GET" && url.pathname === "/v1/sessions") {
+        return sendJson(
+          response,
+          200,
+          sessionsRoute(sqlite, {
+            game: url.searchParams.get("game") ?? undefined,
+            mode: url.searchParams.get("mode") ?? undefined,
+            status: url.searchParams.get("status") ?? undefined,
+          }),
+        );
+      }
+
+      if (sqlite && method === "GET" && url.pathname.startsWith("/v1/sessions/")) {
+        const path = url.pathname.slice("/v1/sessions/".length);
+        if (path.endsWith("/events")) {
+          const sessionId = decodeURIComponent(path.slice(0, -"/events".length));
+          return sendJson(response, 200, sessionEventsRoute(sqlite, sessionId));
+        }
+        const item = sessionRoute(sqlite, decodeURIComponent(path));
+        if (!item) {
+          return sendJson(response, 404, { error: "not-found" });
+        }
+        return sendJson(response, 200, item);
+      }
+
+      if (sqlite && method === "GET" && url.pathname.startsWith("/v1/events/")) {
+        const item = eventRoute(sqlite, decodeURIComponent(url.pathname.slice("/v1/events/".length)));
+        if (!item) {
+          return sendJson(response, 404, { error: "not-found" });
+        }
+        return sendJson(response, 200, item);
+      }
+
+      if (sqlite && method === "GET" && url.pathname === "/v1/review-queue") {
+        return sendJson(response, 200, reviewQueueRoute(sqlite));
+      }
+
+      if (sqlite && method === "POST" && url.pathname.startsWith("/v1/review-queue/")) {
+        const suffix = url.pathname.slice("/v1/review-queue/".length);
+        if (!suffix.endsWith("/resolve")) {
+          return sendJson(response, 404, { error: "not-found" });
+        }
+        const eventId = decodeURIComponent(suffix.slice(0, -"/resolve".length));
+        const body = await readJsonBody(request);
+        try {
+          const result = resolveReviewRoute(sqlite, eventId, body);
+          liveHub.publish({ type: "review.resolved", payload: result });
+          return sendJson(response, 200, result);
+        } catch (error) {
+          if (error instanceof Error && error.message === "review-event-not-found") {
+            return sendJson(response, 404, { error: "review-event-not-found" });
+          }
+          throw error;
+        }
       }
 
       if (method === "GET" && url.pathname.startsWith("/integrations/archidekt/")) {
@@ -117,6 +221,7 @@ export async function startApiServer(
             reject(error);
             return;
           }
+          options.sqlite?.close();
           resolve();
         });
       }),
@@ -127,6 +232,37 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
   response.statusCode = status;
   response.setHeader("content-type", "application/json");
   response.end(JSON.stringify(payload));
+}
+
+function handleCorsPreflight(request: IncomingMessage, response: ServerResponse): void {
+  if (!applyCorsHeaders(request, response)) {
+    sendJson(response, 403, { error: "cors-origin-denied" });
+    return;
+  }
+  response.statusCode = 204;
+  response.end();
+}
+
+function applyCorsHeaders(request: IncomingMessage, response: ServerResponse): boolean {
+  const origin = request.headers.origin;
+  if (!origin) {
+    return true;
+  }
+  const allowlist = (
+    process.env.MANCUTG_CORS_ALLOWLIST ??
+    "http://127.0.0.1:18080,http://localhost:5173,http://127.0.0.1:5173"
+  )
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (!allowlist.includes(origin)) {
+    return false;
+  }
+
+  response.setHeader("access-control-allow-origin", origin);
+  response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+  response.setHeader("access-control-allow-headers", "content-type,authorization");
+  return true;
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {

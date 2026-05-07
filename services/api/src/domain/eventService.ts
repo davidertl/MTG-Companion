@@ -77,6 +77,7 @@ export function applyBackendEventBatch(
   store: EventStore,
   input: unknown,
 ): EventApplyResult {
+  // Legacy /events JSON-store path intentionally remains active while sqlite ingest/read lives separately.
   const batch = backendEventBatchEnvelopeSchema.parse(input);
 
   if (batch.idempotencyKey && store.seenBatchKeys.includes(batch.idempotencyKey)) {

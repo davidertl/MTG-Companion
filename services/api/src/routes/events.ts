@@ -17,6 +17,7 @@ export interface EventsRouteResult {
 }
 
 export function eventsRoute(input: unknown, store: EventStore): EventsRouteResult {
+  // Legacy JSON-store ingest path preserved for compatibility with existing /events clients.
   const payload = backendEventBatchEnvelopeSchema.parse(input);
   const result = applyBackendEventBatch(store, payload);
 
