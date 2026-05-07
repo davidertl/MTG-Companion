@@ -64,7 +64,7 @@ fn parses_representative_mtga_detailed_log_fragments() {
 
     let report = parse_log("session-mtga", &log, 0).expect("mtga-like detailed log should parse");
 
-    assert_eq!(report.events.len(), 5);
+    assert_eq!(report.events.len(), 6);
     assert_eq!(report.events[0].event_type, EventType::MatchStart);
     assert_eq!(
         payload_value(&report.events[0].payload, "deck").as_deref(),
@@ -80,8 +80,13 @@ fn parses_representative_mtga_detailed_log_fragments() {
         payload_value(&report.events[3].payload, "choice").as_deref(),
         Some("Caustic Bronco"),
     );
+    assert_eq!(report.events[4].event_type, EventType::MatchEnd);
     assert_eq!(
-        report.events[4].event_type,
+        payload_value(&report.events[4].payload, "result").as_deref(),
+        Some("win"),
+    );
+    assert_eq!(
+        report.events[5].event_type,
         EventType::Unknown("FuturePatchEvent".to_owned()),
     );
 }

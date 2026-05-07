@@ -226,7 +226,7 @@ Includes:
 - Parser-Erweiterung von Demoformat auf reale Logstrukturen
 - parserVersion / Unknown-Event-Handling / Reprocessing-Grundlage
 
-**Status:** erster Schritt umgesetzt; weitere Erweiterung auf groesseren realen Korpus offen
+**Status:** substantieller Schritt umgesetzt und grün verifiziert; weitere Erweiterung auf groesseren realen Korpus bleibt sinnvoll
 
 ### Phase 4 — ArenaC live watcher and checkpointing
 

@@ -150,20 +150,43 @@ fn parse_mtga_json_line(
         .and_then(Value::as_object)
         .unwrap_or(object);
 
+    let mut payload =
+        flatten_simple_fields(payload_object, &["eventName", "event", "timestamp", "timestampUtc"]);
+
     let event_type = match event_name.as_str() {
         "MatchGameRoomStateChanged" => {
+            insert_alias(&mut payload, payload_object, "match_id", &["matchId", "match_id"]);
+            insert_alias(&mut payload, payload_object, "deck", &["deck", "deckName"]);
+            insert_alias(&mut payload, payload_object, "queue", &["queue", "queueId", "gameMode"]);
+            insert_alias(&mut payload, payload_object, "result", &["result", "winner", "outcome"]);
             let state = string_field(payload_object, "state")
                 .or_else(|| string_field(object, "state"))
                 .unwrap_or_default();
+            payload.insert("state".to_owned(), state.clone());
             if state.contains("Completed") || state.contains("Ended") {
                 EventType::MatchEnd
             } else {
                 EventType::MatchStart
             }
         }
-        "PlayerInventory.GetPlayerCardsV3" => EventType::CollectionSnapshot,
-        "PlayerInventory.GetPlayerInventory" => EventType::InventorySnapshot,
-        "Draft.MakePick" => EventType::DraftPick,
+        "PlayerInventory.GetPlayerCardsV3" => {
+            insert_alias(&mut payload, payload_object, "cards_owned", &["cardsOwned", "cards_owned"]);
+            EventType::CollectionSnapshot
+        }
+        "PlayerInventory.GetPlayerInventory" => {
+            insert_alias(&mut payload, payload_object, "gold", &["gold"]);
+            insert_alias(&mut payload, payload_object, "gems", &["gems"]);
+            insert_alias(&mut payload, payload_object, "wildcards", &["wildcards"]);
+            insert_alias(&mut payload, payload_object, "vault", &["vault"]);
+            EventType::InventorySnapshot
+        }
+        "Draft.MakePick" => {
+            insert_alias(&mut payload, payload_object, "set_code", &["setCode", "set_code"]);
+            insert_alias(&mut payload, payload_object, "pack_number", &["packNumber", "pack_number"]);
+            insert_alias(&mut payload, payload_object, "pick_number", &["pickNumber", "pick_number"]);
+            insert_alias(&mut payload, payload_object, "choice", &["choice"]);
+            EventType::DraftPick
+        }
         other => EventType::Unknown(other.to_owned()),
     };
 
@@ -172,7 +195,7 @@ fn parse_mtga_json_line(
         sequence,
         timestamp,
         event_type,
-        payload: flatten_simple_fields(payload_object, &["eventName", "event", "timestamp", "timestampUtc"]),
+        payload,
     })
 }
 
@@ -207,6 +230,57 @@ fn flatten_simple_fields(object: &Map<String, Value>, reserved: &[&str]) -> BTre
     }
 
     payload
+}
+
+fn insert_alias(
+    payload: &mut BTreeMap<String, String>,
+    object: &Map<String, Value>,
+    target_key: &str,
+    candidate_keys: &[&str],
+) {
+    for candidate in candidate_keys {
+        if let Some(value) = find_scalar_value(object, candidate) {
+            payload.insert(target_key.to_owned(), value);
+            return;
+        }
+    }
+}
+
+fn find_scalar_value(object: &Map<String, Value>, wanted_key: &str) -> Option<String> {
+    if let Some(value) = object.get(wanted_key) {
+        return scalar_to_string(value);
+    }
+
+    for value in object.values() {
+        match value {
+            Value::Object(child) => {
+                if let Some(found) = find_scalar_value(child, wanted_key) {
+                    return Some(found);
+                }
+            }
+            Value::Array(items) => {
+                for item in items {
+                    if let Value::Object(child) = item {
+                        if let Some(found) = find_scalar_value(child, wanted_key) {
+                            return Some(found);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn scalar_to_string(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) => Some(text.clone()),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    }
 }
 
 fn sha256(line: &str) -> String {

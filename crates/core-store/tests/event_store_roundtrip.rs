@@ -1,6 +1,7 @@
 use core_domain::{payload_value, EventType};
 use core_parser::parse_log;
 use core_store::{EventStore, IngestDiagnosticRecord};
+use std::fs;
 
 #[test]
 fn stores_raw_chunks_and_projects_match_inventory_and_draft_data() {
@@ -124,4 +125,38 @@ fn stores_raw_chunks_and_ingest_diagnostics_for_later_reprocessing() {
         .load_unknown_event_labels()
         .expect("unknown events should load");
     assert_eq!(unknown_events, vec!["PATCH_SPECIFIC_EVENT".to_owned()]);
+}
+
+#[test]
+fn projects_representative_mtga_json_log_fragments_into_existing_views() {
+    let log = fs::read_to_string("../core-parser/tests/fixtures/mtga_detailed_log_sample.log")
+        .expect("fixture log should be readable");
+
+    let report = parse_log("session-json", &log, 0).expect("mtga fixture should parse");
+    let store = EventStore::open_in_memory().expect("store should be created");
+    store.apply_report(&report).expect("report should persist");
+
+    let matches = store.load_match_history().expect("match history should load");
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].match_id, "match-1");
+    assert_eq!(matches[0].deck, "Esper Midrange");
+    assert_eq!(matches[0].result.as_deref(), Some("win"));
+
+    let collection = store
+        .latest_collection_snapshot()
+        .expect("collection query should work")
+        .expect("collection snapshot should exist");
+    assert_eq!(collection.cards_owned, 620);
+
+    let inventory = store
+        .latest_inventory_snapshot()
+        .expect("inventory query should work")
+        .expect("inventory snapshot should exist");
+    assert_eq!(inventory.gold, 1200);
+    assert_eq!(inventory.wildcards, 12);
+
+    let picks = store.load_draft_picks().expect("draft picks should load");
+    assert_eq!(picks.len(), 1);
+    assert_eq!(picks[0].set_code, "OTJ");
+    assert_eq!(picks[0].pick_number, 2);
 }
