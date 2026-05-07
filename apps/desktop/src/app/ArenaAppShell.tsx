@@ -252,12 +252,33 @@ export function ArenaAppShell(props: {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.2fr 0.8fr",
+                gridTemplateColumns: "1fr 1fr 1fr",
                 gap: 20,
               }}
             >
               <ShellPanel title="Draft" subtitle={state.draft.summary}>
                 <SummaryMetric label="Picks" value={state.draft.picks.length} />
+              </ShellPanel>
+
+              <ShellPanel title={state.decks.title} subtitle={state.decks.statusMessage}>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <SummaryMetric label="Decks" value={state.decks.totalDecks} />
+                  <button
+                    type="button"
+                    style={{
+                      border: "1px solid #35507a",
+                      borderRadius: 12,
+                      background: state.decks.archidektEnabled ? "#192334" : "#0d121b",
+                      color: "#f7f9fc",
+                      padding: "12px 14px",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {state.decks.importActionLabel}
+                  </button>
+                </div>
               </ShellPanel>
 
               <ShellPanel title="Diagnostics" subtitle="Import and parser visibility">

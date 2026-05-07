@@ -5,7 +5,12 @@ import { ZodError } from "zod";
 import { createInMemoryEventStore, type EventStore } from "./domain/eventService.ts";
 import { createInMemorySyncStore, type SyncStore } from "./domain/syncService.ts";
 import { mediaSessionsRoute } from "./routes/media/index.ts";
-import { buildArchidektImportRoute, type ArchidektFetcher } from "./routes/integrations/archidekt/import.ts";
+import {
+  ArchidektImportRouteError,
+  buildArchidektImportRoute,
+  buildRuntimeArchidektFetcher,
+  type ArchidektFetcher,
+} from "./routes/integrations/archidekt/import.ts";
 import { eventsRoute } from "./routes/events.ts";
 import { syncRoute } from "./routes/sync.ts";
 
@@ -22,18 +27,12 @@ export interface StartedApiServer {
   close: () => Promise<void>;
 }
 
-const defaultArchidektFetcher: ArchidektFetcher = async (deckId) => ({
-  source: "archidekt",
-  deckId,
-  name: `Archidekt Deck ${deckId}`,
-  updatedAt: new Date().toISOString(),
-  cards: [],
-});
-
 export function createApiServer(options: ApiServerOptions = {}): Server {
   const store = options.store ?? createInMemorySyncStore();
   const eventStore = options.eventStore ?? createInMemoryEventStore();
-  const importDeck = buildArchidektImportRoute(options.archidektFetcher ?? defaultArchidektFetcher);
+  const importDeck = buildArchidektImportRoute(
+    options.archidektFetcher ?? buildRuntimeArchidektFetcher(),
+  );
 
   return createServer(async (request, response) => {
     try {
@@ -76,6 +75,10 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
     } catch (error) {
       if (error instanceof ZodError) {
         return sendJson(response, 400, { error: "invalid-request" });
+      }
+
+      if (error instanceof ArchidektImportRouteError) {
+        return sendJson(response, error.status, { error: error.code });
       }
 
       const message = error instanceof Error ? error.message : "unknown error";

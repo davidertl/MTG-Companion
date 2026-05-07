@@ -83,6 +83,38 @@ describe("api server", () => {
     });
   });
 
+  it("maps Archidekt runtime failures to user-facing HTTP errors", async () => {
+    const notFoundServer = await startApiServer(0, {
+      archidektFetcher: async () => {
+        throw new Error("404 deck not found");
+      },
+    });
+    servers.push(notFoundServer);
+    const notFoundAddress = `http://127.0.0.1:${notFoundServer.port}`;
+
+    const notFound = await fetch(`${notFoundAddress}/integrations/archidekt/deck-1`);
+    expect(notFound.status).toBe(404);
+    await expect(notFound.json()).resolves.toMatchObject({
+      error: "archidekt-deck-not-found",
+    });
+
+    const rateLimitedServer = await startApiServer(0, {
+      archidektFetcher: async () => {
+        throw new Error("429 rate limit reached");
+      },
+    });
+    servers.push(rateLimitedServer);
+    const rateLimitedAddress = `http://127.0.0.1:${rateLimitedServer.port}`;
+
+    const rateLimited = await fetch(
+      `${rateLimitedAddress}/integrations/archidekt/deck-1`,
+    );
+    expect(rateLimited.status).toBe(429);
+    await expect(rateLimited.json()).resolves.toMatchObject({
+      error: "archidekt-rate-limited",
+    });
+  });
+
   it("accepts a shared backend event envelope from both ArenaC and PaperC", async () => {
     const server = await startApiServer(0);
     servers.push(server);

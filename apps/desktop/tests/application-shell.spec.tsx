@@ -11,6 +11,11 @@ describe("MancuTG-ArenaC application shell", () => {
       hasDetailedLogs: true,
       logPath: "/tmp/Player.log",
       watcherRunning: true,
+      privacy: {
+        telemetryEnabled: false,
+        syncEnabled: false,
+        allowedPurposes: ["updates", "archidekt"],
+      },
       importSummary: {
         platformTag: "ios",
         sourceKind: "folder-import",
@@ -63,6 +68,7 @@ describe("MancuTG-ArenaC application shell", () => {
     expect(html).toContain("Match History");
     expect(html).toContain("Collection");
     expect(html).toContain("Inventory");
+    expect(html).toContain("Import Archidekt deck (read-only)");
     expect(html).toContain("Diagnostics");
     expect(html).toContain("Privacy");
     expect(html).toContain("Wipe local data");

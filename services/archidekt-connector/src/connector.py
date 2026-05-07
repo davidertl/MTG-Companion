@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import argparse
+import json
+import sys
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
@@ -88,3 +91,22 @@ def normalize_deck(deck: Any, deck_id: str) -> dict[str, Any]:
         "updatedAt": updated_at,
         "cards": list(normalized_cards.values()),
     }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Read-only Archidekt deck importer")
+    parser.add_argument("--deck-id", required=True, help="Archidekt deck identifier")
+    args = parser.parse_args()
+
+    try:
+        snapshot = import_deck(args.deck_id)
+    except ArchidektImportError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    print(json.dumps(snapshot))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

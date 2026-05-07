@@ -92,7 +92,9 @@ export function buildArenaAppShellState(input: ArenaAppShellInput) {
     collection: buildCollectionRouteState(input.collection),
     inventory: buildInventoryRouteState(input.inventory),
     draft: buildDraftRouteState(input.draftPicks ?? []),
-    decks: buildDecksRouteState(input.decks ?? []),
+    decks: buildDecksRouteState(input.decks ?? [], {
+      archidektEnabled: privacy.allowedPurposes.includes("archidekt"),
+    }),
     diagnostics: buildDiagnosticsRouteState(
       input.diagnostics ?? [],
       input.unknownEvents ?? [],
