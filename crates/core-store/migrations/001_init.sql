@@ -30,3 +30,11 @@ CREATE TABLE IF NOT EXISTS log_checkpoints (
   pending_fragment TEXT NOT NULL,
   last_sequence INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ingest_diagnostics (
+  session_id TEXT NOT NULL,
+  source_path TEXT NOT NULL,
+  diagnostic_kind TEXT NOT NULL,
+  message TEXT NOT NULL,
+  detail_json TEXT NOT NULL
+);

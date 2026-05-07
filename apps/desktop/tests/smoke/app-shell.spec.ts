@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildCollectionRouteState,
   buildDecksRouteState,
+  buildDiagnosticsRouteState,
   buildDraftRouteState,
   buildHistoryRouteState,
   buildImportCenterState,
+  buildInventoryRouteState,
   buildPrivacyRouteState,
   buildSettingsState,
   getSetupBanner,
@@ -21,7 +23,9 @@ describe("desktop shell exports", () => {
     );
     expect(buildHistoryRouteState([]).empty).toBe(true);
     expect(buildCollectionRouteState(undefined).empty).toBe(true);
+    expect(buildInventoryRouteState(undefined).empty).toBe(true);
     expect(buildDraftRouteState([]).empty).toBe(true);
+    expect(buildDiagnosticsRouteState([], []).empty).toBe(true);
     expect(buildSettingsState(privacy).offlineCapable).toBe(true);
     expect(buildDecksRouteState([]).empty).toBe(true);
     expect(buildImportCenterState().availableMethods).toHaveLength(2);

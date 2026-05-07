@@ -1,8 +1,9 @@
 use core_domain::{
     payload_value, CollectionSnapshot, DraftPick, EventType, ImportSourceKind, InventorySnapshot,
-    LogSession, MatchRecord, NormalizedEvent, ParseReport, PlatformTag,
+    LogSession, MatchRecord, NormalizedEvent, ParseReport, PlatformTag, RawChunk,
 };
 use rusqlite::{params, Connection};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -10,7 +11,7 @@ pub struct EventStore {
     connection: Connection,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LogCheckpointRecord {
     pub log_path: String,
     pub session_id: String,
@@ -18,6 +19,15 @@ pub struct LogCheckpointRecord {
     pub source_fingerprint: String,
     pub pending_fragment: String,
     pub last_sequence: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct IngestDiagnosticRecord {
+    pub session_id: String,
+    pub source_path: String,
+    pub diagnostic_kind: String,
+    pub message: String,
+    pub detail_json: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +95,28 @@ impl EventStore {
             .map(|count| count as usize)
     }
 
+    pub fn load_raw_chunks_for_session(
+        &self,
+        session_id: &str,
+    ) -> rusqlite::Result<Vec<RawChunk>> {
+        let mut statement = self.connection.prepare(
+            "SELECT session_id, chunk_offset, sha256, raw_text
+             FROM raw_chunks
+             WHERE session_id = ?1
+             ORDER BY chunk_offset ASC",
+        )?;
+        let rows = statement.query_map(params![session_id], |row| {
+            Ok(RawChunk {
+                session_id: row.get(0)?,
+                offset: row.get::<_, i64>(1)? as u64,
+                sha256: row.get(2)?,
+                raw_text: row.get(3)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
     pub fn load_log_checkpoint(
         &self,
         log_path: &str,
@@ -139,6 +171,84 @@ impl EventStore {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn load_all_log_checkpoints(&self) -> rusqlite::Result<Vec<LogCheckpointRecord>> {
+        let mut statement = self.connection.prepare(
+            "SELECT log_path, session_id, byte_offset, source_fingerprint, pending_fragment, last_sequence
+             FROM log_checkpoints
+             ORDER BY log_path ASC",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(LogCheckpointRecord {
+                log_path: row.get(0)?,
+                session_id: row.get(1)?,
+                byte_offset: row.get::<_, i64>(2)? as u64,
+                source_fingerprint: row.get(3)?,
+                pending_fragment: row.get(4)?,
+                last_sequence: row.get::<_, i64>(5)? as u64,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    pub fn append_ingest_diagnostics(
+        &self,
+        diagnostics: &[IngestDiagnosticRecord],
+    ) -> rusqlite::Result<()> {
+        let transaction = self.connection.unchecked_transaction()?;
+        {
+            let mut statement = transaction.prepare(
+                "INSERT INTO ingest_diagnostics (
+                    session_id,
+                    source_path,
+                    diagnostic_kind,
+                    message,
+                    detail_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            for diagnostic in diagnostics {
+                statement.execute(params![
+                    diagnostic.session_id,
+                    diagnostic.source_path,
+                    diagnostic.diagnostic_kind,
+                    diagnostic.message,
+                    diagnostic.detail_json,
+                ])?;
+            }
+        }
+        transaction.commit()
+    }
+
+    pub fn load_ingest_diagnostics(&self) -> rusqlite::Result<Vec<IngestDiagnosticRecord>> {
+        let mut statement = self.connection.prepare(
+            "SELECT session_id, source_path, diagnostic_kind, message, detail_json
+             FROM ingest_diagnostics
+             ORDER BY rowid ASC",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(IngestDiagnosticRecord {
+                session_id: row.get(0)?,
+                source_path: row.get(1)?,
+                diagnostic_kind: row.get(2)?,
+                message: row.get(3)?,
+                detail_json: row.get(4)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    pub fn load_unknown_event_labels(&self) -> rusqlite::Result<Vec<String>> {
+        let events = self.load_events()?;
+        Ok(events
+            .into_iter()
+            .filter_map(|event| match event.event_type {
+                EventType::Unknown(label) => Some(label),
+                _ => None,
+            })
+            .collect())
     }
 
     pub fn apply_report(&self, report: &ParseReport) -> rusqlite::Result<PersistStats> {

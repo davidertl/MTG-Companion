@@ -19,3 +19,7 @@ export function exportHistoryAsCsv(rows: HistoryRow[]): string {
 
   return [header, ...body].join("\n");
 }
+
+export function exportBackupBundleAsJson(bundle: unknown): string {
+  return JSON.stringify(bundle, null, 2);
+}

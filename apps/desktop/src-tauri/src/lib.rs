@@ -3,7 +3,7 @@ use core_domain::{
     MatchRecord, PlatformTag,
 };
 use core_parser::parse_log_lossy;
-use core_store::{EventStore, LogCheckpointRecord};
+use core_store::{EventStore, IngestDiagnosticRecord, LogCheckpointRecord};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -60,6 +60,60 @@ pub struct LiveLogWatchSummary {
     pub rotation_detected: bool,
     pub truncation_detected: bool,
     pub pending_fragment_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedSessionSummary {
+    pub session_id: String,
+    pub platform_tag: String,
+    pub source_kind: String,
+    pub source_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportDiagnosticSummary {
+    pub session_id: String,
+    pub source_path: String,
+    pub diagnostic_kind: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReprocessSessionSummary {
+    pub session_id: String,
+    pub raw_chunk_count: usize,
+    pub reparsed_event_count: usize,
+    pub parse_warnings: Vec<String>,
+    pub unknown_events: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupBundle {
+    pub sessions: Vec<ImportedSessionSummary>,
+    pub match_history: Vec<MatchRecord>,
+    pub collection_snapshot: Option<CollectionSnapshot>,
+    pub inventory_snapshot: Option<InventorySnapshot>,
+    pub draft_picks: Vec<DraftPick>,
+    pub unknown_events: Vec<String>,
+    pub diagnostics: Vec<ImportDiagnosticSummary>,
+    pub checkpoints: Vec<LogCheckpointRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalStoreSummary {
+    pub sessions: Vec<ImportedSessionSummary>,
+    pub match_history: Vec<MatchRecord>,
+    pub collection_snapshot: Option<CollectionSnapshot>,
+    pub inventory_snapshot: Option<InventorySnapshot>,
+    pub draft_picks: Vec<DraftPick>,
+    pub unknown_events: Vec<String>,
+    pub diagnostics: Vec<ImportDiagnosticSummary>,
+    pub checkpoints: Vec<LogCheckpointRecord>,
 }
 
 fn default_store_path() -> Result<PathBuf, String> {
@@ -158,13 +212,13 @@ pub fn import_offline_logs(
 
         inserted_raw_chunks += persist_stats.inserted_raw_chunks;
         inserted_events += persist_stats.inserted_events;
-        imported_paths.push(session.source_path);
-        parse_warnings.extend(
-            lossy_report
-                .warnings
-                .into_iter()
-                .map(|warning| format!("{}: {}", log_path.display(), warning.message)),
-        );
+        imported_paths.push(session.source_path.clone());
+        let diagnostics =
+            build_ingest_diagnostics(&session_id, &session.source_path, &lossy_report);
+        parse_warnings.extend(diagnostics.iter().map(|diagnostic| diagnostic.message.clone()));
+        store
+            .append_ingest_diagnostics(&diagnostics)
+            .map_err(|error| format!("failed to persist import diagnostics: {error}"))?;
     }
 
     Ok(OfflineLogImportSummary {
@@ -193,6 +247,71 @@ pub fn import_ios_logs(
             roots,
         },
     )
+}
+
+pub fn inspect_local_store(optional_store_path: Option<&str>) -> Result<LocalStoreSummary, String> {
+    let store = open_store(optional_store_path)?;
+    build_local_store_summary(&store)
+}
+
+pub fn reprocess_session(
+    session_id: &str,
+    optional_store_path: Option<&str>,
+) -> Result<ReprocessSessionSummary, String> {
+    let store = open_store(optional_store_path)?;
+    let raw_chunks = store
+        .load_raw_chunks_for_session(session_id)
+        .map_err(|error| format!("failed to load raw chunks for session {session_id}: {error}"))?;
+
+    if raw_chunks.is_empty() {
+        return Err(format!("no raw chunks found for session {session_id}"));
+    }
+
+    let mut reconstructed = String::new();
+    for (index, chunk) in raw_chunks.iter().enumerate() {
+        if index > 0 {
+            reconstructed.push('\n');
+        }
+        reconstructed.push_str(&chunk.raw_text);
+    }
+
+    let reparsed = parse_log_lossy(session_id, &reconstructed, 0);
+    let unknown_events = reparsed
+        .report
+        .events
+        .iter()
+        .filter_map(|event| match &event.event_type {
+            EventType::Unknown(label) => Some(label.clone()),
+            _ => None,
+        })
+        .collect();
+
+    Ok(ReprocessSessionSummary {
+        session_id: session_id.to_owned(),
+        raw_chunk_count: raw_chunks.len(),
+        reparsed_event_count: reparsed.report.events.len(),
+        parse_warnings: reparsed
+            .warnings
+            .into_iter()
+            .map(|warning| warning.message)
+            .collect(),
+        unknown_events,
+    })
+}
+
+pub fn export_backup_bundle(optional_store_path: Option<&str>) -> Result<BackupBundle, String> {
+    let store = open_store(optional_store_path)?;
+    let summary = build_local_store_summary(&store)?;
+    Ok(BackupBundle {
+        sessions: summary.sessions,
+        match_history: summary.match_history,
+        collection_snapshot: summary.collection_snapshot,
+        inventory_snapshot: summary.inventory_snapshot,
+        draft_picks: summary.draft_picks,
+        unknown_events: summary.unknown_events,
+        diagnostics: summary.diagnostics,
+        checkpoints: summary.checkpoints,
+    })
 }
 
 pub fn watch_live_log_once(
@@ -301,11 +420,14 @@ pub fn watch_live_log_once_with_store(
             .map_err(|error| format!("failed to persist watched log data: {error}"))?;
         inserted_raw_chunks = persist_stats.inserted_raw_chunks;
         inserted_events = persist_stats.inserted_events;
-        parse_warnings = lossy_report
-            .warnings
-            .into_iter()
-            .map(|warning| warning.message)
+        let diagnostics = build_ingest_diagnostics(&session_id, &path_string, &lossy_report);
+        parse_warnings = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message.clone())
             .collect();
+        store
+            .append_ingest_diagnostics(&diagnostics)
+            .map_err(|error| format!("failed to persist watch diagnostics: {error}"))?;
     }
 
     let updated_checkpoint = LogCheckpointRecord {
@@ -381,6 +503,93 @@ fn build_import_session_id(platform_tag: &PlatformTag, content: &str) -> String 
     format!("{}-{:x}", platform_tag.label(), hasher.finalize())
 }
 
+fn build_ingest_diagnostics(
+    session_id: &str,
+    source_path: &str,
+    lossy_report: &core_parser::LossyParseResult,
+) -> Vec<IngestDiagnosticRecord> {
+    let mut diagnostics = lossy_report
+        .warnings
+        .iter()
+        .map(|warning| IngestDiagnosticRecord {
+            session_id: session_id.to_owned(),
+            source_path: source_path.to_owned(),
+            diagnostic_kind: "parse-warning".to_owned(),
+            message: warning.message.clone(),
+            detail_json: warning.line.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    diagnostics.extend(
+        lossy_report
+            .report
+            .events
+            .iter()
+            .filter_map(|event| match &event.event_type {
+                EventType::Unknown(label) => Some(IngestDiagnosticRecord {
+                    session_id: session_id.to_owned(),
+                    source_path: source_path.to_owned(),
+                    diagnostic_kind: "unknown-event".to_owned(),
+                    message: format!("unknown event label: {label}"),
+                    detail_json: serde_json::to_string(&event.payload)
+                        .unwrap_or_else(|_| "{}".to_owned()),
+                }),
+                _ => None,
+            }),
+    );
+
+    diagnostics
+}
+
+fn build_local_store_summary(store: &EventStore) -> Result<LocalStoreSummary, String> {
+    let sessions = store
+        .load_log_sessions()
+        .map_err(|error| format!("failed to load sessions: {error}"))?
+        .into_iter()
+        .map(|session| ImportedSessionSummary {
+            session_id: session.session_id,
+            platform_tag: session.platform_tag.label().to_owned(),
+            source_kind: session.source_kind.label().to_owned(),
+            source_path: session.source_path,
+        })
+        .collect();
+
+    let diagnostics = store
+        .load_ingest_diagnostics()
+        .map_err(|error| format!("failed to load diagnostics: {error}"))?
+        .into_iter()
+        .map(|diagnostic| ImportDiagnosticSummary {
+            session_id: diagnostic.session_id,
+            source_path: diagnostic.source_path,
+            diagnostic_kind: diagnostic.diagnostic_kind,
+            message: diagnostic.message,
+        })
+        .collect();
+
+    Ok(LocalStoreSummary {
+        sessions,
+        match_history: store
+            .load_match_history()
+            .map_err(|error| format!("failed to load match history: {error}"))?,
+        collection_snapshot: store
+            .latest_collection_snapshot()
+            .map_err(|error| format!("failed to load collection snapshot: {error}"))?,
+        inventory_snapshot: store
+            .latest_inventory_snapshot()
+            .map_err(|error| format!("failed to load inventory snapshot: {error}"))?,
+        draft_picks: store
+            .load_draft_picks()
+            .map_err(|error| format!("failed to load draft picks: {error}"))?,
+        unknown_events: store
+            .load_unknown_event_labels()
+            .map_err(|error| format!("failed to load unknown events: {error}"))?,
+        diagnostics,
+        checkpoints: store
+            .load_all_log_checkpoints()
+            .map_err(|error| format!("failed to load checkpoints: {error}"))?,
+    })
+}
+
 fn build_live_watch_fingerprint(content: &[u8]) -> String {
     let limit = content.len().min(4096);
     format!("{}:{}", limit, sha256_bytes(&content[..limit]))
@@ -427,7 +636,7 @@ fn max_consumed_sequence(a: u64, b: u64) -> u64 {
 }
 
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
+    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
 }
 
 pub fn run_cli(args: &[String]) -> Result<String, String> {
@@ -448,6 +657,22 @@ pub fn run_cli(args: &[String]) -> Result<String, String> {
             let result = watch_live_log_once(log_path, args.get(2).map(String::as_str))?;
             serde_json::to_string_pretty(&result)
                 .map_err(|error| format!("failed to serialize watch result: {error}"))
+        }
+        "inspect-store" => {
+            let result = inspect_local_store(args.get(1).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize store summary: {error}"))
+        }
+        "reprocess-session" => {
+            let session_id = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
+            let result = reprocess_session(session_id, args.get(2).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize reprocess summary: {error}"))
+        }
+        "export-backup" => {
+            let result = export_backup_bundle(args.get(1).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize backup bundle: {error}"))
         }
         "import-ios-file" => {
             let log_path = args.get(1).ok_or_else(|| cli_usage().to_owned())?;

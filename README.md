@@ -55,6 +55,7 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - `apps/desktop/src` - route-nahe Query-, Export-, Privacy-, Setup- und Deck-Cache-Logik
   - inklusive iOS/iPadOS-Offline-Importflow fuer `.log`-Dateien per Drag & Drop oder Ordnerimport
   - Live-Log-Watcher mit Checkpoints, Partial-Line-Buffering und Rotation-/Truncation-Erkennung
+  - lokale Store-Summary, Import-Diagnostik, Reprocessing und Backup-Export auf Basis gespeicherter Raw Chunks
 - **MancuTG-backend-Grundlage**
   - `services/api/src` - optionale Sync-, Auth-, Archidekt-Import- und Telemetry-Services
   - `services/worker/src` - Hintergrundjob-Grundlage fuer serverseitige Verarbeitungsaufgaben
@@ -148,6 +149,24 @@ Einen Ordner mit exportierten iOS-Logs importieren:
 
 ```bash
 cargo run -p mancutg-arenac -- import-ios-folder "/pfad/zum/export-ordner" "/pfad/zur/mancutg-arenac.sqlite3"
+```
+
+Lokalen Store zusammenfassen:
+
+```bash
+cargo run -p mancutg-arenac -- inspect-store "/pfad/zur/mancutg-arenac.sqlite3"
+```
+
+Eine gespeicherte Session aus Raw Chunks erneut parsen:
+
+```bash
+cargo run -p mancutg-arenac -- reprocess-session "<session-id>" "/pfad/zur/mancutg-arenac.sqlite3"
+```
+
+Backup-Bundle aus dem lokalen Store exportieren:
+
+```bash
+cargo run -p mancutg-arenac -- export-backup "/pfad/zur/mancutg-arenac.sqlite3"
 ```
 
 #### MancuTG-backend lokal starten

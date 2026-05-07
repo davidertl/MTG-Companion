@@ -43,6 +43,7 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 - minimales MancuTG-PaperC-Contract-Skeleton unter `apps/paperc/`
 - erster ArenaC-MTGA-Detailed-Log-Schritt mit Fixture-basiertem Golden-Test fuer MTGA-like JSON-Logfragmente
 - ArenaC Live-Log-Watcher mit Checkpoints, Rotation-/Truncation-Erkennung und Partial-Line-Buffering
+- ArenaC lokale Store-Summary, Import-Diagnostik, Reprocessing und Backup-Export auf Basis gespeicherter Raw Chunks
 - Archidekt read-only Connector
 - durchgehende TS-/Rust-/Python-Testabdeckung fuer diese Foundations
 
@@ -50,7 +51,6 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 
 - noch kein umfassender produktionsreifer MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
 - keine echte Tauri-/React-Oberflaeche fuer MancuTG-ArenaC
-- keine vollstaendigen lokalen Read Models / Export-/Reprocessing-Flows fuer reale MTGA-Logs
 - keine Privacy-/Settings-/Consent-Oberflaechen fuer MancuTG-ArenaC
 - keine gehärtete Archidekt-Read-only-MVP-Produktintegration
 - kein MVP-Release-Hardening fuer MancuTG-ArenaC
@@ -249,6 +249,8 @@ Includes:
 - Export JSON/CSV/optional Backup
 - Reprocessing bestehender Raw Chunks
 - Unknown-Event-/Import-Fehlerdiagnose
+
+**Status:** im aktuellen Branch umgesetzt und gruen verifiziert
 
 ### Phase 6 — MancuTG-ArenaC application shell
 

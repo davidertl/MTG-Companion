@@ -1,6 +1,6 @@
 use core_domain::{payload_value, EventType};
 use core_parser::parse_log;
-use core_store::EventStore;
+use core_store::{EventStore, IngestDiagnosticRecord};
 
 #[test]
 fn stores_raw_chunks_and_projects_match_inventory_and_draft_data() {
@@ -86,4 +86,42 @@ fn preserves_session_ingest_order_and_latest_snapshots_across_multiple_reports()
         .expect("inventory query should work")
         .expect("inventory snapshot should exist");
     assert_eq!(inventory.gold, 6400);
+}
+
+#[test]
+fn stores_raw_chunks_and_ingest_diagnostics_for_later_reprocessing() {
+    let log = "\
+2026-05-06T21:00:00Z|MATCH_START|match_id=match-1|deck=Temur|queue=ranked
+2026-05-06T21:01:00Z|PATCH_SPECIFIC_EVENT|foo=bar
+";
+
+    let report = parse_log("session-raw", log, 0).expect("test log should parse");
+    let store = EventStore::open_in_memory().expect("store should be created");
+    store.apply_report(&report).expect("report should persist");
+    store
+        .append_ingest_diagnostics(&[
+            IngestDiagnosticRecord {
+                session_id: "session-raw".to_owned(),
+                source_path: "/tmp/Player.log".to_owned(),
+                diagnostic_kind: "unknown-event".to_owned(),
+                message: "unknown event label: PATCH_SPECIFIC_EVENT".to_owned(),
+                detail_json: "{\"foo\":\"bar\"}".to_owned(),
+            },
+        ])
+        .expect("diagnostics should persist");
+
+    let raw_chunks = store
+        .load_raw_chunks_for_session("session-raw")
+        .expect("raw chunks should load");
+    assert_eq!(raw_chunks.len(), 2);
+
+    let diagnostics = store
+        .load_ingest_diagnostics()
+        .expect("diagnostics should load");
+    assert_eq!(diagnostics.len(), 1);
+
+    let unknown_events = store
+        .load_unknown_event_labels()
+        .expect("unknown events should load");
+    assert_eq!(unknown_events, vec!["PATCH_SPECIFIC_EVENT".to_owned()]);
 }
