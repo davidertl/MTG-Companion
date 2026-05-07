@@ -52,6 +52,7 @@ name = "core-parser"
 version = "0.1.0"
 dependencies = [
  "core-domain",
+ "serde_json",
  "sha2",
  "thiserror",
 ]

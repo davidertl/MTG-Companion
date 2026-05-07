@@ -58,6 +58,10 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - `services/api/src` - optionale Sync-, Auth-, Archidekt-Import- und Telemetry-Services
   - `services/worker/src` - Hintergrundjob-Grundlage fuer serverseitige Verarbeitungsaufgaben
   - persistente JSON-Speicherung fuer Session-/Event-/Media-Metadaten im Runtime-Server
+- **Minimales MancuTG-PaperC-Skeleton**
+  - `apps/paperc/src` - Contract-/Capture-/Event-/Tournament-Builder zur Validierung der Shared Contracts
+- **Erster ArenaC-Detailed-Log-Schritt**
+  - `crates/core-parser` versteht jetzt neben dem Demoformat auch MTGA-like JSON-Logfragmente mit Golden-Test-Fixture
 - **Archidekt-Connector fuer MancuTG-backend**
   - `services/archidekt-connector/src/connector.py` - read-only Import ueber `pyrchidekt`-kompatiblen Adapter
 - **Gemeinsame Vertrage**
@@ -110,6 +114,12 @@ Das fuehrt aus:
 - `npm run test:ts`
 - `npm run test:rust`
 - `npm run test:python`
+
+API-Smoke-Test separat:
+
+```bash
+npm run api:smoke
+```
 
 ### Benutzbare Foundations-Einstiegspunkte
 

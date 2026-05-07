@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   backendEventBatchEnvelopeSchema,
   backendEventEnvelopeSchema,
@@ -8,22 +10,31 @@ import {
   type MediaIngestRequest,
   type PapercObservationPayload,
 } from "../../../../packages/shared-schema/src/index";
+import {
+  validatePapercEventContract,
+  validatePapercSessionContract,
+} from "../../../../packages/shared-schema/src/paperc";
 
 export function buildPapercObservationEvent(
-  input: BackendEventEnvelope,
+  input: z.input<typeof backendEventEnvelopeSchema>,
 ): BackendEventEnvelope {
   return backendEventEnvelopeSchema.parse(input);
 }
 
 export function buildPapercEventBatch(
-  input: BackendEventBatchEnvelope,
+  input: z.input<typeof backendEventBatchEnvelopeSchema>,
 ): BackendEventBatchEnvelope {
-  return backendEventBatchEnvelopeSchema.parse(input);
+  const parsed = backendEventBatchEnvelopeSchema.parse(input);
+  return {
+    ...parsed,
+    sessions: parsed.sessions.map((session) => validatePapercSessionContract(session)),
+    events: parsed.events.map((event) => validatePapercEventContract(event)),
+  };
 }
 
 export function buildPapercMediaRequest(
-  captureSession: MediaCaptureSession,
-  artifacts: MediaIngestRequest["artifacts"],
+  captureSession: z.input<typeof mediaIngestRequestSchema.shape.captureSession>,
+  artifacts: z.input<typeof mediaIngestRequestSchema.shape.artifacts>,
   idempotencyKey?: string,
 ): MediaIngestRequest {
   return mediaIngestRequestSchema.parse({

@@ -37,21 +37,23 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
   - `GET /health`
   - `GET /integrations/archidekt/:deckId`
 - file-basierte persistente Speicherung fuer Sessions, Events und Media-Metadaten
+- API-Smoke-Test und CI-Haertung fuer den aktuellen Foundations-Stand
 - MancuTG-ArenaC-CLI fuer lokale Arena-Log-Workflows
 - iOS/iPadOS-Offline-Importpfad in MancuTG-ArenaC
+- minimales MancuTG-PaperC-Contract-Skeleton unter `apps/paperc/`
+- erster ArenaC-MTGA-Detailed-Log-Schritt mit Fixture-basiertem Golden-Test fuer MTGA-like JSON-Logfragmente
 - Archidekt read-only Connector
 - durchgehende TS-/Rust-/Python-Testabdeckung fuer diese Foundations
 
 ### Noch nicht produktvollstaendig
 
-- kein echter MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
+- noch kein umfassender produktionsreifer MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
 - kein Live-Log-Watcher mit Checkpointing fuer MancuTG-ArenaC
 - keine echte Tauri-/React-Oberflaeche fuer MancuTG-ArenaC
 - keine vollstaendigen lokalen Read Models / Export-/Reprocessing-Flows fuer reale MTGA-Logs
 - keine Privacy-/Settings-/Consent-Oberflaechen fuer MancuTG-ArenaC
 - keine gehärtete Archidekt-Read-only-MVP-Produktintegration
 - kein MVP-Release-Hardening fuer MancuTG-ArenaC
-- kein minimales PaperC-Client-Skelett zur echten Contract-Validierung
 - keine Review-Queue oder Korrekturprojektoren im Backend
 - keine Turnier-/Match-Projektoren fuer mehrere gleichzeitige Spiele
 - keine echte Worker-Laufzeit fuer Detection/Review/Finalize
@@ -179,6 +181,8 @@ Includes:
 - CI-Workflow-Pruefung
 - README-Kommandos gegen echten Repo-Zustand verifizieren
 
+**Status:** bereits im aktuellen Branch umgesetzt und grün verifiziert
+
 ### Phase 1 — Shared backend contract stabilization
 
 **Goal:** Die app-uebergreifenden Contracts zwischen ArenaC, PaperC und backend sauber halten, ohne PaperC bereits produktiv auszubauen.
@@ -188,6 +192,8 @@ Includes:
 - Dedupe-/Idempotenzverhalten absichern
 - Media-Session-Vertraege beibehalten
 - Backend-Endpunkte `/events`, `/media/sessions`, `/sync`, `/health` stabil halten
+
+**Status:** bereits im aktuellen Branch umgesetzt und grün verifiziert
 
 ### Phase 2 — Minimal MancuTG-PaperC contract skeleton
 
@@ -208,6 +214,8 @@ Explicitly not included:
 - keine Tournament Projectors
 - keine Worker Runtime
 
+**Status:** bereits als minimales Skeleton umgesetzt; bewusst nicht weiter vertiefen vor ArenaC-MVP
+
 ### Phase 3 — ArenaC real MTGA detailed-log parser
 
 **Goal:** ArenaC muss echte MTGA-Detailed-Logs verlaesslich verarbeiten koennen.
@@ -217,6 +225,8 @@ Includes:
 - Golden Tests
 - Parser-Erweiterung von Demoformat auf reale Logstrukturen
 - parserVersion / Unknown-Event-Handling / Reprocessing-Grundlage
+
+**Status:** erster Schritt umgesetzt; weitere Erweiterung auf groesseren realen Korpus offen
 
 ### Phase 4 — ArenaC live watcher and checkpointing
 
