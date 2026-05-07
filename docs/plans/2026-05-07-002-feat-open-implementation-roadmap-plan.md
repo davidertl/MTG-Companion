@@ -46,13 +46,13 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 - ArenaC lokale Store-Summary, Import-Diagnostik, Reprocessing und Backup-Export auf Basis gespeicherter Raw Chunks
 - React-basierte MancuTG-ArenaC Application Shell mit Navigation, Setup-, Import-, History-, Collection-, Inventory-, Diagnostics-, Privacy- und Settings-Surfaces
 - ArenaC Privacy-/Settings-/Consent-Persistenz inkl. lokale Datenverwaltung und CLI-Steuerung
+- Archidekt read-only MVP mit echtem Runtime-Fetcher, Cache, Fehlerabbildung und consent-aware Deck-Surface
 - Archidekt read-only Connector
 - durchgehende TS-/Rust-/Python-Testabdeckung fuer diese Foundations
 
 ### Noch nicht produktvollstaendig
 
 - noch kein umfassender produktionsreifer MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
-- keine gehärtete Archidekt-Read-only-MVP-Produktintegration
 - kein MVP-Release-Hardening fuer MancuTG-ArenaC
 - keine Review-Queue oder Korrekturprojektoren im Backend
 - keine Turnier-/Match-Projektoren fuer mehrere gleichzeitige Spiele
@@ -290,6 +290,8 @@ Includes:
 - Cache-/TTL-Entscheidungen
 - ArenaC Import UI
 - lokale Snapshot-Speicherung
+
+**Status:** im aktuellen Branch umgesetzt und gruen verifiziert
 
 ### Phase 9 — ArenaC MVP polish and release hardening
 

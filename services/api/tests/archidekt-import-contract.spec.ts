@@ -72,13 +72,13 @@ describe("archidekt import contract", () => {
       throw new Error("429 rate limit reached");
     });
 
-    await expect(notFoundRoute("deck-1")).rejects.toMatchObject<ArchidektImportRouteError>({
+    await expect(notFoundRoute("deck-1")).rejects.toMatchObject({
       status: 404,
       code: "archidekt-deck-not-found",
-    });
-    await expect(rateLimitedRoute("deck-1")).rejects.toMatchObject<ArchidektImportRouteError>({
+    } satisfies Partial<ArchidektImportRouteError>);
+    await expect(rateLimitedRoute("deck-1")).rejects.toMatchObject({
       status: 429,
       code: "archidekt-rate-limited",
-    });
+    } satisfies Partial<ArchidektImportRouteError>);
   });
 });

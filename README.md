@@ -68,6 +68,7 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - `crates/core-parser` versteht jetzt neben dem Demoformat auch MTGA-like JSON-Logfragmente mit Golden-Test-Fixture
 - **Archidekt-Connector fuer MancuTG-backend**
   - `services/archidekt-connector/src/connector.py` - read-only Import ueber `pyrchidekt`-kompatiblen Adapter
+  - runtimefaehiger Python-Connector-Pfad fuer read-only Deckimporte inklusive Fehlerabbildung und Cache im Backend
 - **Gemeinsame Vertrage**
   - `packages/shared-schema/src` - zod-validierte Schemas fuer Sync, Privacy, Sessions, Events, PaperC-Turnierkontext und Media-Ingest
 
