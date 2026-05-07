@@ -32,6 +32,8 @@ export type DeckSnapshot = z.infer<typeof deckSnapshotSchema>;
 export type SyncObject = z.infer<typeof syncObjectSchema>;
 export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;
 
+export const INGEST_BATCHES_CONTRACT_VERSION = "v1";
+
 export * from "./events.ts";
 export * from "./imports.ts";
 export * from "./media.ts";

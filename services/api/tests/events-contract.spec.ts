@@ -4,6 +4,9 @@ import {
   createInMemoryEventStore,
   eventsRoute,
 } from "../src/index";
+import {
+  ingestBatchResponseSchema,
+} from "../../../packages/shared-schema/src/index";
 
 function papercSession(sourceSessionId: string) {
   return {
@@ -376,5 +379,26 @@ describe("eventsRoute", () => {
         store,
       ),
     ).toThrow(/unknown session/);
+  });
+
+  it("parses v1 ingest response contract with partial errors", () => {
+    const parsed = ingestBatchResponseSchema.parse({
+      batchId: "batch_01",
+      accepted: 8,
+      duplicates: 2,
+      rejected: 1,
+      errors: [
+        {
+          eventId: "paper-session-123-obs-3-0",
+          code: "invalid_payload",
+          message: "payload.zone is required",
+        },
+      ],
+    });
+
+    expect(parsed.accepted).toBe(8);
+    expect(parsed.duplicates).toBe(2);
+    expect(parsed.rejected).toBe(1);
+    expect(parsed.errors).toHaveLength(1);
   });
 });

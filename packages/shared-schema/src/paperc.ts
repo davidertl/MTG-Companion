@@ -14,6 +14,8 @@ export const papercEventTypeSchema = z.enum([
   "paperc.correction.applied",
   "paperc.match.finalized",
   "paperc.match.reopened",
+  "mtg.paper.review.requested",
+  "mtg.paper.card.observed.confirmed",
 ]);
 
 export const papercCaptureContextSchema = tournamentContextSchema.extend({
@@ -126,6 +128,19 @@ export const papercMatchReopenedPayloadSchema = tournamentContextSchema.extend({
   supersededFinalizationEventId: z.string().min(1),
 });
 
+export const mtgPaperReviewRequestedPayloadSchema = z.object({
+  candidate: z.string().min(1),
+  reason: z.string().min(1),
+  confidence: z.number().min(0).max(1).optional(),
+  sourceEventId: z.string().min(1).optional(),
+});
+
+export const mtgPaperCardObservedConfirmedPayloadSchema = z.object({
+  cardName: z.string().min(1),
+  confirmedBy: z.string().min(1),
+  sourceEventId: z.string().min(1).optional(),
+});
+
 const papercPayloadSchemas = {
   "paperc.observation.detected": papercObservationPayloadSchema,
   "paperc.review.requested": papercReviewRequestedPayloadSchema,
@@ -133,6 +148,8 @@ const papercPayloadSchemas = {
   "paperc.correction.applied": papercCorrectionAppliedPayloadSchema,
   "paperc.match.finalized": papercMatchFinalizedPayloadSchema,
   "paperc.match.reopened": papercMatchReopenedPayloadSchema,
+  "mtg.paper.review.requested": mtgPaperReviewRequestedPayloadSchema,
+  "mtg.paper.card.observed.confirmed": mtgPaperCardObservedConfirmedPayloadSchema,
 } as const;
 
 const allowedSourceAppsByEventType: Record<
@@ -145,6 +162,8 @@ const allowedSourceAppsByEventType: Record<
   "paperc.correction.applied": ["mancutg-backend"],
   "paperc.match.finalized": ["mancutg-paperc", "mancutg-backend"],
   "paperc.match.reopened": ["mancutg-backend"],
+  "mtg.paper.review.requested": ["mancutg-paperc", "mancutg-backend"],
+  "mtg.paper.card.observed.confirmed": ["mancutg-paperc", "mancutg-backend"],
 };
 
 export type PapercEventType = z.infer<typeof papercEventTypeSchema>;
@@ -170,6 +189,12 @@ export type PapercMatchFinalizedPayload = z.infer<
 >;
 export type PapercMatchReopenedPayload = z.infer<
   typeof papercMatchReopenedPayloadSchema
+>;
+export type MtgPaperReviewRequestedPayload = z.infer<
+  typeof mtgPaperReviewRequestedPayloadSchema
+>;
+export type MtgPaperCardObservedConfirmedPayload = z.infer<
+  typeof mtgPaperCardObservedConfirmedPayloadSchema
 >;
 
 export function validatePapercSessionContract(

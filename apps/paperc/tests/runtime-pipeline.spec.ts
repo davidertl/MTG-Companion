@@ -8,6 +8,7 @@ import {
   buildPapercEventBatchFromSnapshot,
   type PapercRuntimeConfig,
 } from "../src/index";
+import { ingestBatchRequestSchema } from "../../../packages/shared-schema/src/index";
 
 const config: PapercRuntimeConfig = {
   captureSessionId: "capture-a",
@@ -93,5 +94,50 @@ describe("PaperC runtime pipeline", () => {
     expect(result.frameCount).toBe(2);
     expect(result.recall).toBe(1);
     expect(result.exactMatchFrames).toBe(2);
+  });
+
+  it("parses PaperC producer ingest batch contract", () => {
+    const parsed = ingestBatchRequestSchema.parse({
+      idempotencyKey: "paperc-device-1-session-123-batch-42",
+      producer: {
+        app: "mancutg-paperc",
+        version: "0.1.0",
+        instanceId: "windows-device-1",
+        displayName: "David Paper Table",
+      },
+      game: {
+        gameKey: "mtg-paper",
+        gameFamily: "mtg",
+        title: "Magic: The Gathering",
+        mode: "paper",
+      },
+      session: {
+        sourceSessionId: "paper-session-123",
+        startedAt: "2026-05-07T18:00:00.000Z",
+        source: "camera",
+      },
+      events: [
+        {
+          eventId: "paper-session-123-obs-1-0",
+          sourceEventId: "paper-session-123-obs-1-0",
+          eventType: "mtg.paper.review.requested",
+          occurredAt: "2026-05-07T18:00:01.000Z",
+          seq: 100,
+          payload: {
+            candidate: "Island",
+            reason: "low_confidence",
+          },
+          confidence: 0.62,
+          provenance: {
+            source: "camera-frame",
+            frameNo: 1,
+          },
+        },
+      ],
+    });
+
+    expect(parsed.producer.instanceId).toBe("windows-device-1");
+    expect(parsed.game.mode).toBe("paper");
+    expect(parsed.events[0].sourceEventId).toBe("paper-session-123-obs-1-0");
   });
 });

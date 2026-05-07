@@ -130,9 +130,86 @@ export const backendEventBatchEnvelopeSchema = z.object({
   events: z.array(backendEventEnvelopeSchema).min(1),
 });
 
+export const ingestProducerSchema = z.object({
+  app: eventSourceAppSchema,
+  version: z.string().min(1),
+  instanceId: z.string().min(1),
+  displayName: z.string().min(1).optional(),
+});
+
+export const ingestGameSchema = z.object({
+  gameKey: z.string().min(1),
+  gameFamily: z.string().min(1),
+  title: z.string().min(1),
+  mode: z.enum(["arena", "paper", "service"]),
+});
+
+export const ingestSessionSchema = z.object({
+  sourceSessionId: z.string().min(1),
+  startedAt: z.string().min(1),
+  endedAt: z.string().min(1).optional(),
+  source: z.string().min(1),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const ingestEventProvenanceSchema = z.object({
+  source: z.string().min(1),
+  lineNumber: z.number().int().nonnegative().optional(),
+  frameNo: z.number().int().nonnegative().optional(),
+  frameTimeMs: z.number().int().nonnegative().optional(),
+  parserVersion: z.string().min(1).optional(),
+  modelVersion: z.string().min(1).optional(),
+  artifactId: z.string().min(1).optional(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const ingestEventSchema = z.object({
+  eventId: z.string().min(1),
+  sourceEventId: z.string().min(1),
+  eventType: z.string().min(1),
+  occurredAt: z.string().min(1),
+  seq: z.number().int().nonnegative().optional(),
+  actor: z.record(z.string(), z.unknown()).optional(),
+  object: z.record(z.string(), z.unknown()).optional(),
+  targets: z.array(z.record(z.string(), z.unknown())).default([]),
+  payload: z.record(z.string(), z.unknown()).default({}),
+  confidence: z.number().min(0).max(1).optional(),
+  provenance: ingestEventProvenanceSchema,
+});
+
+export const ingestBatchRequestSchema = z.object({
+  idempotencyKey: z.string().min(1),
+  producer: ingestProducerSchema,
+  game: ingestGameSchema,
+  session: ingestSessionSchema,
+  events: z.array(ingestEventSchema).min(1),
+});
+
+export const ingestBatchErrorSchema = z.object({
+  eventId: z.string().min(1),
+  code: z.string().min(1),
+  message: z.string().min(1),
+});
+
+export const ingestBatchResponseSchema = z.object({
+  batchId: z.string().min(1),
+  accepted: z.number().int().nonnegative(),
+  duplicates: z.number().int().nonnegative(),
+  rejected: z.number().int().nonnegative(),
+  errors: z.array(ingestBatchErrorSchema).default([]),
+});
+
 export type EventSourceApp = z.infer<typeof eventSourceAppSchema>;
 export type EventSourceKind = z.infer<typeof eventSourceKindSchema>;
 export type ReviewStatus = z.infer<typeof reviewStatusSchema>;
 export type BackendEventSession = z.infer<typeof backendEventSessionSchema>;
 export type BackendEventEnvelope = z.infer<typeof backendEventEnvelopeSchema>;
 export type BackendEventBatchEnvelope = z.infer<typeof backendEventBatchEnvelopeSchema>;
+export type IngestProducer = z.infer<typeof ingestProducerSchema>;
+export type IngestGame = z.infer<typeof ingestGameSchema>;
+export type IngestSession = z.infer<typeof ingestSessionSchema>;
+export type IngestEventProvenance = z.infer<typeof ingestEventProvenanceSchema>;
+export type IngestEvent = z.infer<typeof ingestEventSchema>;
+export type IngestBatchRequest = z.infer<typeof ingestBatchRequestSchema>;
+export type IngestBatchError = z.infer<typeof ingestBatchErrorSchema>;
+export type IngestBatchResponse = z.infer<typeof ingestBatchResponseSchema>;
