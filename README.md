@@ -34,12 +34,10 @@ Dieses Repository definiert die Zielarchitektur fuer eine neue App, die diese Fa
 
 - `docs/architecture/unified-mtg-companion-architecture.md` - Produkt- und Zielarchitektur
 - `docs/plans/README.md` - kanonischer Plan-Index (Project, Architecture, ArenaC, PaperC, API-Protocol, Backend, Roadmap)
-- `docs/plans/2026-05-06-001-feat-unified-mtg-companion-platform-plan.md` - technische Umsetzungsplanung
 - `docs/privacy/data-flow.md` - dokumentierter Datenfluss fuer Offline-, Sync- und Telemetriepfade
 - `docs/release/README.md` - Release-Hinweise fuer den aktuellen ArenaC-MVP-Stand
 - `docs/release/mancutg-arenac-mvp-checklist.md` - konkrete Release-Checkliste fuer MancuTG-ArenaC
 - `docs/release/overwolf-install.md` - Installation der Windows-Overwolf-Variante von MancuTG-ArenaC
-- `docs/plans/2026-05-07-003-decision-arenac-overwolf-windows-shell.md` - Entscheidung: Overwolf als Windows-MVP-Shell
 - `LICENSE` - Apache License 2.0
 
 ## Architektur in einem Satz
@@ -323,4 +321,6 @@ MANCUTG_BACKEND_STORE_PATH=/pfad/zur/store-datei npm run api:start
 - Archidekt ist in der ersten Stufe **read-only** und wird serverseitig ueber MancuTG-backend isoliert.
 - Eine spaetere iOS-App wird nur als **Viewer/Sync/Import-Helper** betrachtet, nicht als Live-Tracker.
 - MancuTG-PaperC ist die reservierte Bezeichnung fuer die separate Papierkarten-Video-Tracking-App.
+- PaperC ist als eigenstaendige Windows-Desktopoberflaeche fuer Notebooks mit angeschlossener Webcam vorgesehen (nicht Overwolf-gebunden).
+- PaperC erzeugt einen Live-Game-Log in der UI und kann denselben Event-Strom an den Backend-Endpunkt `POST /events` weiterleiten.
 - Neue Arbeit in diesem Repository bleibt **Apache-2.0-kompatibel**.

@@ -49,3 +49,5 @@
 - No replay UI
 - No ArenaC overlay/HUD
 - No full PaperC product runtime
+- No PaperC operator workbench yet (camera settings, zone calibration, player naming, live recognition/log view)
+- PaperC is not part of the Overwolf deployment path; it targets a standalone Windows webcam setup

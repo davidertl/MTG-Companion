@@ -41,6 +41,9 @@ jobs:
       - name: TypeScript tests
         run: npm run test:ts
 
+      - name: PaperC quality gate
+        run: npm run paperc:quality
+
       - name: Install Overwolf app dependencies
         run: npm install --prefix apps/overwolf
 

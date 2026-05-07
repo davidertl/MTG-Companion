@@ -22,9 +22,46 @@ export const papercCaptureContextSchema = tournamentContextSchema.extend({
   videoSourceId: z.string().min(1).optional(),
 });
 
+export const papercPlayerSchema = z.object({
+  playerId: z.string().min(1),
+  displayName: z.string().min(1),
+  seatRef: z.enum(["north", "south", "east", "west"]),
+});
+
+export const papercZoneSchema = z.object({
+  zoneId: z.string().min(1),
+  zoneKind: z.enum([
+    "battlefield",
+    "graveyard",
+    "library",
+    "exile",
+    "hand",
+    "command",
+  ]),
+  ownerPlayerId: z.string().min(1).optional(),
+  rect: z.object({
+    x: z.number().min(0),
+    y: z.number().min(0),
+    width: z.number().positive(),
+    height: z.number().positive(),
+  }),
+});
+
+export const papercFrameDetectionSchema = z.object({
+  detectionId: z.string().min(1),
+  frameNo: z.number().int().nonnegative(),
+  frameTimeMs: z.number().int().nonnegative(),
+  zoneId: z.string().min(1),
+  candidateName: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  cardCount: z.number().int().positive().default(1),
+});
+
 export const papercSessionMetadataSchema = z.object({
   capture: papercCaptureContextSchema,
   calibrationId: z.string().min(1).optional(),
+  players: z.array(papercPlayerSchema).default([]),
+  zones: z.array(papercZoneSchema).default([]),
   reviewerRequiredByDefault: z.boolean().optional(),
   notes: z.string().min(1).optional(),
 });
@@ -45,6 +82,7 @@ export const papercObservationPayloadSchema = papercCaptureContextSchema.extend(
       frameTimeMs: z.number().int().nonnegative().optional(),
     })
     .optional(),
+  detections: z.array(papercFrameDetectionSchema).default([]),
   details: z.record(z.string(), z.unknown()).default({}),
 });
 
@@ -111,6 +149,9 @@ const allowedSourceAppsByEventType: Record<
 
 export type PapercEventType = z.infer<typeof papercEventTypeSchema>;
 export type PapercCaptureContext = z.infer<typeof papercCaptureContextSchema>;
+export type PapercPlayer = z.infer<typeof papercPlayerSchema>;
+export type PapercZone = z.infer<typeof papercZoneSchema>;
+export type PapercFrameDetection = z.infer<typeof papercFrameDetectionSchema>;
 export type PapercSessionMetadata = z.infer<typeof papercSessionMetadataSchema>;
 export type PapercObservationPayload = z.infer<
   typeof papercObservationPayloadSchema

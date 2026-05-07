@@ -10,6 +10,7 @@
     "arenac:smoke": "bash scripts/arenac_smoke.sh",
     "overwolf:build": "npm install --prefix apps/overwolf && npm run build --prefix apps/overwolf",
     "overwolf:smoke": "node scripts/overwolf_smoke.mjs",
+    "paperc:quality": "vitest run apps/paperc/tests/runtime-pipeline.spec.ts",
     "desktop:help": "cargo run -p mancutg-arenac -- --help",
     "typecheck": "tsc --noEmit",
     "test:ts": "vitest run",
