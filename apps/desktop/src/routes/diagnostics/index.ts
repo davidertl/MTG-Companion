@@ -11,6 +11,7 @@ export interface DiagnosticsRouteState {
   unknownEventCount: number;
   warningCount: number;
   diagnostics: ImportDiagnosticView[];
+  unknownEvents: string[];
 }
 
 export function buildDiagnosticsRouteState(
@@ -23,5 +24,6 @@ export function buildDiagnosticsRouteState(
     unknownEventCount: unknownEvents.length,
     warningCount: diagnostics.length,
     diagnostics,
+    unknownEvents,
   };
 }

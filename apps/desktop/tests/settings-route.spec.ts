@@ -10,7 +10,7 @@ describe("settings route state", () => {
       allowedPurposes: ["updates", "telemetry", "archidekt"],
     });
 
-    const state = buildSettingsState(settings);
+    const state = buildSettingsState(settings, false);
 
     expect(state.telemetryEnabled).toBe(true);
     expect(state.syncEnabled).toBe(false);

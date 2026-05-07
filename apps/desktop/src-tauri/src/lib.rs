@@ -90,12 +90,15 @@ impl Default for ArenaPrivacySettings {
 #[serde(rename_all = "camelCase")]
 pub struct ArenaSettings {
     pub privacy: ArenaPrivacySettings,
+    #[serde(default)]
+    pub detailed_logs_acknowledged: bool,
 }
 
 impl Default for ArenaSettings {
     fn default() -> Self {
         Self {
             privacy: ArenaPrivacySettings::default(),
+            detailed_logs_acknowledged: false,
         }
     }
 }
@@ -432,6 +435,16 @@ pub fn set_consent(
     settings.privacy.allowed_purposes.sort();
     settings.privacy.allowed_purposes.dedup();
 
+    save_arena_settings(&settings, optional_settings_path)?;
+    Ok(settings)
+}
+
+pub fn set_detailed_logs_acknowledged(
+    acknowledged: bool,
+    optional_settings_path: Option<&str>,
+) -> Result<ArenaSettings, String> {
+    let mut settings = load_arena_settings(optional_settings_path)?;
+    settings.detailed_logs_acknowledged = acknowledged;
     save_arena_settings(&settings, optional_settings_path)?;
     Ok(settings)
 }

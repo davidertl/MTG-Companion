@@ -9,6 +9,7 @@ describe("MancuTG-ArenaC application shell", () => {
   it("renders a shell that exposes the existing ArenaC workflows", () => {
     const state = buildArenaAppShellState({
       hasDetailedLogs: true,
+      detailedLogsAcknowledged: true,
       logPath: "/tmp/Player.log",
       watcherRunning: true,
       privacy: {

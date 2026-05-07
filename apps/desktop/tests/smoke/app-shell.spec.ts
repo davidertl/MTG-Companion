@@ -26,7 +26,7 @@ describe("desktop shell exports", () => {
     expect(buildInventoryRouteState(undefined).empty).toBe(true);
     expect(buildDraftRouteState([]).empty).toBe(true);
     expect(buildDiagnosticsRouteState([], []).empty).toBe(true);
-    expect(buildSettingsState(privacy).offlineCapable).toBe(true);
+    expect(buildSettingsState(privacy, false).offlineCapable).toBe(true);
     expect(buildDecksRouteState([]).empty).toBe(true);
     expect(buildImportCenterState().availableMethods).toHaveLength(2);
     expect(buildPrivacyRouteState(privacy).modeLabel).toBe("Offline-only mode");

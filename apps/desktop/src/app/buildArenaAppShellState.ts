@@ -30,6 +30,7 @@ export type ArenaShellActions = {
 export type ArenaAppShellInput = {
   hasDetailedLogs: boolean;
   logPath?: string;
+  detailedLogsAcknowledged?: boolean;
   watcherRunning?: boolean;
   privacy?: Partial<PrivacySettings>;
   importSummary?: ImportCenterSummary;
@@ -97,7 +98,7 @@ export function buildArenaAppShellState(input: ArenaAppShellInput) {
       input.unknownEvents ?? [],
     ),
     privacy: buildPrivacyRouteState(privacy),
-    settings: buildSettingsState(privacy),
+    settings: buildSettingsState(privacy, input.detailedLogsAcknowledged ?? false),
   };
 }
 

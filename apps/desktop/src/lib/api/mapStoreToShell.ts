@@ -96,8 +96,9 @@ export function mapToArenaAppShellInput(params: {
   });
 
   return {
-    hasDetailedLogs: Boolean(logPath),
+    hasDetailedLogs: params.settings.detailedLogsAcknowledged ?? false,
     logPath,
+    detailedLogsAcknowledged: params.settings.detailedLogsAcknowledged ?? false,
     watcherRunning: params.watcherRunning,
     privacy,
     importSummary: params.lastImportSummary ?? undefined,

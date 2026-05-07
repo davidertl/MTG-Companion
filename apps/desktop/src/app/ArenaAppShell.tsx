@@ -3,14 +3,45 @@ import type { ReactNode } from "react";
 import { ShellPanel } from "../components/ShellPanel";
 import { SummaryMetric } from "../components/SummaryMetric";
 import { ActionCluster } from "../components/ActionCluster";
+import {
+  CollectionPanel,
+  DecksPanel,
+  DiagnosticsPanel,
+  DraftPanel,
+  ImportsPanel,
+  InventoryPanel,
+  MatchHistoryPanel,
+  PrivacyPanel,
+  SettingsPanel,
+  SetupPanel,
+} from "../components/route-panels";
+import { ArenaSideNav } from "./ArenaSideNav";
+import type { ArenaRouteId } from "./routes";
 import type { ArenaAppShellState } from "./buildArenaAppShellState";
 
 export function ArenaAppShell(props: {
   state: ArenaAppShellState;
   /** When set, replaces the default action button cluster (e.g. live UI toolbar). */
   toolbarSlot?: ReactNode;
+  /** Rendered below the Setup checklist (e.g. Detailed Logs acknowledgment). */
+  setupPanelFooter?: ReactNode;
+  /** Opens the Overwolf setup window for service URL and log path (Overwolf only). */
+  onOpenSetupWizard?: () => void;
+  /** Highlighted nav entry. Defaults to "imports" for back-compat with the dashboard SSR helper. */
+  activeRoute?: ArenaRouteId;
+  /** Side nav click handler. When omitted, nav is rendered but inert. */
+  onNavigate?: (id: ArenaRouteId) => void;
 }) {
-  const { state, toolbarSlot } = props;
+  const {
+    state,
+    toolbarSlot,
+    setupPanelFooter,
+    onOpenSetupWizard,
+    activeRoute = "imports",
+    onNavigate,
+  } = props;
+
+  const navigate = onNavigate ?? (() => {});
 
   return (
     <main
@@ -92,10 +123,7 @@ export function ArenaAppShell(props: {
             )}
           </section>
 
-          <ShellPanel
-            title="System pulse"
-            subtitle="Arena-first operational snapshot"
-          >
+          <ShellPanel title="System pulse" subtitle="Arena-first operational snapshot">
             <div
               style={{
                 display: "grid",
@@ -107,10 +135,7 @@ export function ArenaAppShell(props: {
                 label="Watcher"
                 value={state.watcherRunning ? "Running" : "Idle"}
               />
-              <SummaryMetric
-                label="Known matches"
-                value={state.history.totalMatches}
-              />
+              <SummaryMetric label="Known matches" value={state.history.totalMatches} />
               <SummaryMetric
                 label="Imported sessions"
                 value={state.imports.lastImportSummary?.importedSessions ?? 0}
@@ -130,42 +155,7 @@ export function ArenaAppShell(props: {
             gap: 20,
           }}
         >
-          <aside
-            style={{
-              background: "#0f1520",
-              border: "1px solid #24324a",
-              borderRadius: 20,
-              padding: 20,
-              display: "grid",
-              gap: 12,
-              alignContent: "start",
-            }}
-          >
-            <span
-              style={{
-                color: "#8ea0bc",
-                fontSize: 13,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-              }}
-            >
-              Navigation
-            </span>
-            {state.nav.map((item) => (
-              <div
-                key={item}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  color: item === "Imports" ? "#f7f9fc" : "#b6c5da",
-                  background: item === "Imports" ? "#182336" : "transparent",
-                  fontWeight: item === "Imports" ? 700 : 500,
-                }}
-              >
-                {item}
-              </div>
-            ))}
-          </aside>
+          <ArenaSideNav active={activeRoute} onNavigate={navigate} />
 
           <section style={{ display: "grid", gap: 20 }}>
             <div
@@ -175,50 +165,8 @@ export function ArenaAppShell(props: {
                 gap: 20,
               }}
             >
-              <ShellPanel title="Setup" subtitle={state.setup.banner}>
-                <ul style={{ margin: 0, paddingLeft: 20 }}>
-                  {state.setup.checklist.map((item) => (
-                    <li key={item.id} style={{ marginBottom: 8 }}>
-                      <strong style={{ color: item.complete ? "#87e0a2" : "#f7f9fc" }}>
-                        {item.complete ? "Done" : "Pending"}
-                      </strong>{" "}
-                      <span>{item.label}</span>
-                    </li>
-                  ))}
-                </ul>
-              </ShellPanel>
-
-              <ShellPanel
-                title={state.imports.title}
-                subtitle={
-                  state.imports.summary ??
-                  "Desktop and iOS offline imports are available from one place."
-                }
-              >
-                <div style={{ display: "grid", gap: 10 }}>
-                  {state.imports.availableMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      style={{
-                        background: "#0d121b",
-                        border: "1px solid #24324a",
-                        borderRadius: 14,
-                        padding: 14,
-                      }}
-                    >
-                      <strong style={{ display: "block", color: "#f7f9fc" }}>
-                        {method.label}
-                      </strong>
-                      <span style={{ color: "#8ea0bc", fontSize: 14 }}>
-                        {method.description}
-                      </span>
-                    </div>
-                  ))}
-                  <p style={{ margin: 0, color: "#8ea0bc", fontSize: 14 }}>
-                    {state.imports.iosGuidance.primaryGuidance}
-                  </p>
-                </div>
-              </ShellPanel>
+              <SetupPanel state={state.setup} footer={setupPanelFooter} />
+              <ImportsPanel state={state.imports} variant="compact" />
             </div>
 
             <div
@@ -228,31 +176,9 @@ export function ArenaAppShell(props: {
                 gap: 20,
               }}
             >
-              <ShellPanel title="Match History" subtitle={`Last deck: ${state.history.lastDeck ?? "none"}`}>
-                <SummaryMetric label="Matches" value={state.history.totalMatches} />
-              </ShellPanel>
-
-              <ShellPanel title="Collection" subtitle={state.collection.message}>
-                <SummaryMetric
-                  label="Cards owned"
-                  value={state.collection.cardsOwned}
-                />
-              </ShellPanel>
-
-              <ShellPanel title="Inventory" subtitle={state.inventory.message}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  <SummaryMetric label="Gold" value={state.inventory.gold} />
-                  <SummaryMetric label="Gems" value={state.inventory.gems} />
-                  <SummaryMetric label="Wildcards" value={state.inventory.wildcards} />
-                  <SummaryMetric label="Vault" value={state.inventory.vault} />
-                </div>
-              </ShellPanel>
+              <MatchHistoryPanel state={state.history} variant="compact" />
+              <CollectionPanel state={state.collection} />
+              <InventoryPanel state={state.inventory} />
             </div>
 
             <div
@@ -262,49 +188,9 @@ export function ArenaAppShell(props: {
                 gap: 20,
               }}
             >
-              <ShellPanel title="Draft" subtitle={state.draft.summary}>
-                <SummaryMetric label="Picks" value={state.draft.picks.length} />
-              </ShellPanel>
-
-              <ShellPanel title={state.decks.title} subtitle={state.decks.statusMessage}>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <SummaryMetric label="Decks" value={state.decks.totalDecks} />
-                  <button
-                    type="button"
-                    style={{
-                      border: "1px solid #35507a",
-                      borderRadius: 12,
-                      background: state.decks.archidektEnabled ? "#192334" : "#0d121b",
-                      color: "#f7f9fc",
-                      padding: "12px 14px",
-                      fontSize: 14,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {state.decks.importActionLabel}
-                  </button>
-                </div>
-              </ShellPanel>
-
-              <ShellPanel title="Diagnostics" subtitle="Import and parser visibility">
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  <SummaryMetric
-                    label="Warnings"
-                    value={state.diagnostics.warningCount}
-                  />
-                  <SummaryMetric
-                    label="Unknown events"
-                    value={state.diagnostics.unknownEventCount}
-                  />
-                </div>
-              </ShellPanel>
+              <DraftPanel state={state.draft} variant="compact" />
+              <DecksPanel state={state.decks} variant="compact" />
+              <DiagnosticsPanel state={state.diagnostics} variant="compact" />
             </div>
 
             <div
@@ -314,42 +200,11 @@ export function ArenaAppShell(props: {
                 gap: 20,
               }}
             >
-              <ShellPanel title="Privacy" subtitle={state.privacy.networkPosture}>
-                <ul style={{ margin: 0, paddingLeft: 20 }}>
-                  <li>Telemetry: {state.privacy.telemetryEnabled ? "On" : "Off"}</li>
-                  <li>Sync: {state.privacy.syncEnabled ? "On" : "Off"}</li>
-                  <li>Archidekt access: {state.privacy.archidektEnabled ? "On" : "Off"}</li>
-                </ul>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "#8ea0bc" }}>
-                  {state.privacy.localDataStays.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "#8ea0bc" }}>
-                  {state.privacy.outboundDataUses.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </ShellPanel>
-
-              <ShellPanel title="Settings" subtitle="Offline-first defaults are preserved">
-                <ul style={{ margin: 0, paddingLeft: 20 }}>
-                  <li>Sync enabled: {state.settings.syncEnabled ? "Yes" : "No"}</li>
-                  <li>
-                    Telemetry enabled: {state.settings.telemetryEnabled ? "Yes" : "No"}
-                  </li>
-                  <li>
-                    Archidekt enabled: {state.settings.archidektEnabled ? "Yes" : "No"}
-                  </li>
-                  <li>Offline capable: {state.settings.offlineCapable ? "Yes" : "No"}</li>
-                  <li>Settings file: {state.settings.settingsFileName}</li>
-                </ul>
-                <ul style={{ margin: 0, paddingLeft: 20, color: "#8ea0bc" }}>
-                  {state.settings.actions.map((action) => (
-                    <li key={action}>{action}</li>
-                  ))}
-                </ul>
-              </ShellPanel>
+              <PrivacyPanel state={state.privacy} />
+              <SettingsPanel
+                state={state.settings}
+                onOpenSetupWizard={onOpenSetupWizard}
+              />
             </div>
           </section>
         </div>

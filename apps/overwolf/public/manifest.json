@@ -18,19 +18,19 @@
   "data": {
     "game_targeting": {
       "type": "dedicated",
-      "game_ids": [21566]
+      "game_ids": [21308]
     },
-    "game_events": [21566],
-    "launch_events": {
-      "game_launch": [21566]
-    },
-    "extra-objects": {
-      "processManager": {
-        "file": "plugins/ProcessManager.dll",
-        "class": "TODO.REPLACE_WITH_PROCESS_MANAGER_PLUGIN_CLASS"
+    "game_events": [21308],
+    "launch_events": [
+      {
+        "event": "GameLaunch",
+        "tracked": false,
+        "event_data": {
+          "game_ids": [21308]
+        }
       }
-    },
-    "start_window": "setup",
+    ],
+    "start_window": "main",
     "windows": {
       "setup": {
         "file": "setup.html",
@@ -45,6 +45,62 @@
         "resizable": true,
         "size": { "width": 1100, "height": 720 },
         "min_size": { "width": 800, "height": 560 }
+      },
+      "imports": {
+        "file": "imports.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 900, "height": 680 },
+        "min_size": { "width": 720, "height": 520 }
+      },
+      "collection": {
+        "file": "collection.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 900, "height": 680 },
+        "min_size": { "width": 720, "height": 520 }
+      },
+      "inventory": {
+        "file": "inventory.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 900, "height": 680 },
+        "min_size": { "width": 720, "height": 520 }
+      },
+      "draft": {
+        "file": "draft.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 900, "height": 680 },
+        "min_size": { "width": 720, "height": 520 }
+      },
+      "decks": {
+        "file": "decks.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 900, "height": 680 },
+        "min_size": { "width": 720, "height": 520 }
+      },
+      "diagnostics": {
+        "file": "diagnostics.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 1000, "height": 700 },
+        "min_size": { "width": 720, "height": 520 }
+      },
+      "privacy": {
+        "file": "privacy.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 900, "height": 680 },
+        "min_size": { "width": 720, "height": 520 }
+      },
+      "settings": {
+        "file": "settings.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 900, "height": 680 },
+        "min_size": { "width": 720, "height": 520 }
       }
     }
   }

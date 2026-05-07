@@ -21,10 +21,10 @@ use tower_http::cors::CorsLayer;
 
 use crate::{
     bootstrap_local_companion, export_backup_bundle, import_ios_logs, inspect_local_store,
-    load_arena_settings, reset_arena_settings, reprocess_session, set_consent, wipe_local_data,
-    watch_live_log_once_with_store, ArenaSettings, BackupBundle, DesktopBootstrap,
-    LiveLogWatchSummary, LocalDataRemovalSummary, LocalStoreSummary, OfflineLogImportSummary,
-    ReprocessSessionSummary,
+    load_arena_settings, reset_arena_settings, reprocess_session, set_consent,
+    set_detailed_logs_acknowledged, wipe_local_data, watch_live_log_once_with_store, ArenaSettings,
+    BackupBundle, DesktopBootstrap, LiveLogWatchSummary, LocalDataRemovalSummary, LocalStoreSummary,
+    OfflineLogImportSummary, ReprocessSessionSummary,
 };
 
 const SERVICE_FILE_NAME: &str = "mancutg-arenac-service.json";
@@ -252,9 +252,10 @@ pub async fn run_serve(args: &[String]) -> Result<(), String> {
     );
 
     let app = build_router(state.clone());
+    let handshake_path_shutdown = handshake_path.clone();
     let shutdown = async move {
         let _ = tokio::signal::ctrl_c().await;
-        remove_handshake(&handshake_path);
+        remove_handshake(&handshake_path_shutdown);
     };
 
     axum::serve(listener, app)
@@ -282,6 +283,7 @@ fn build_router(state: AppState) -> Router {
         .route("/v1/export-backup", get(export_backup_handler))
         .route("/v1/settings", get(settings_get))
         .route("/v1/settings/consent", post(settings_consent))
+        .route("/v1/settings/detailed-logs", post(settings_detailed_logs))
         .route("/v1/settings/reset", post(settings_reset))
         .route("/v1/import/ios-file", post(import_ios_file_handler))
         .route("/v1/import/ios-folder", post(import_ios_folder_handler))
@@ -662,6 +664,25 @@ async fn settings_consent(
         inner.settings_path_str()
     };
     let settings = set_consent(&body.purpose, body.enabled, Some(&path)).map_err(ApiError::from)?;
+    Ok(Json(settings))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DetailedLogsAckBody {
+    acknowledged: bool,
+}
+
+async fn settings_detailed_logs(
+    State(state): State<AppState>,
+    Json(body): Json<DetailedLogsAckBody>,
+) -> Result<Json<ArenaSettings>, ApiError> {
+    let path = {
+        let inner = state.inner.lock().map_err(|_| ApiError::internal("lock poisoned"))?;
+        inner.settings_path_str()
+    };
+    let settings =
+        set_detailed_logs_acknowledged(body.acknowledged, Some(&path)).map_err(ApiError::from)?;
     Ok(Json(settings))
 }
 

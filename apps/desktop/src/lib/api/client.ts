@@ -18,6 +18,7 @@ export type ArenaSettingsDto = {
     syncEnabled: boolean;
     allowedPurposes: string[];
   };
+  detailedLogsAcknowledged?: boolean;
 };
 
 export type LocalStoreSummaryDto = {
@@ -142,6 +143,13 @@ export class ArenacApi {
     return this.request("/v1/settings/consent", {
       method: "POST",
       body: JSON.stringify({ purpose, enabled }),
+    });
+  }
+
+  setDetailedLogsAcknowledged(acknowledged: boolean): Promise<ArenaSettingsDto> {
+    return this.request("/v1/settings/detailed-logs", {
+      method: "POST",
+      body: JSON.stringify({ acknowledged }),
     });
   }
 
