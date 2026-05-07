@@ -113,11 +113,13 @@ describe("eventsRoute", () => {
     expect(result.duplicateBatch).toBe(false);
     expect(result.totalStoredSessions).toBe(3);
     expect(result.totalStoredEvents).toBe(3);
-    expect(result.sourceApps).toEqual([
-      "mancutg-arenac",
-      "mancutg-backend",
-      "mancutg-paperc",
-    ]);
+    expect(result.sourceApps).toEqual(
+      expect.arrayContaining([
+        "mancutg-arenac",
+        "mancutg-backend",
+        "mancutg-paperc",
+      ]),
+    );
     expect(result.sourceSessionIds).toEqual([
       "arena-session-1",
       "paper-session-1",

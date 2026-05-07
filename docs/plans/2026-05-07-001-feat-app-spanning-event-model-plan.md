@@ -1,7 +1,7 @@
 ---
 title: feat: Implement the app-spanning event model
 type: feat
-status: active
+status: completed
 date: 2026-05-07
 ---
 
