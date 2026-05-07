@@ -291,6 +291,17 @@ export function ArenaAppShell(props: {
                 <ul style={{ margin: 0, paddingLeft: 20 }}>
                   <li>Telemetry: {state.privacy.telemetryEnabled ? "On" : "Off"}</li>
                   <li>Sync: {state.privacy.syncEnabled ? "On" : "Off"}</li>
+                  <li>Archidekt access: {state.privacy.archidektEnabled ? "On" : "Off"}</li>
+                </ul>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "#8ea0bc" }}>
+                  {state.privacy.localDataStays.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "#8ea0bc" }}>
+                  {state.privacy.outboundDataUses.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
                 </ul>
               </ShellPanel>
 
@@ -300,7 +311,16 @@ export function ArenaAppShell(props: {
                   <li>
                     Telemetry enabled: {state.settings.telemetryEnabled ? "Yes" : "No"}
                   </li>
+                  <li>
+                    Archidekt enabled: {state.settings.archidektEnabled ? "Yes" : "No"}
+                  </li>
                   <li>Offline capable: {state.settings.offlineCapable ? "Yes" : "No"}</li>
+                  <li>Settings file: {state.settings.settingsFileName}</li>
+                </ul>
+                <ul style={{ margin: 0, paddingLeft: 20, color: "#8ea0bc" }}>
+                  {state.settings.actions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
                 </ul>
               </ShellPanel>
             </div>

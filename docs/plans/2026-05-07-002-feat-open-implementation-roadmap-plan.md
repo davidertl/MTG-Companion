@@ -45,13 +45,13 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 - ArenaC Live-Log-Watcher mit Checkpoints, Rotation-/Truncation-Erkennung und Partial-Line-Buffering
 - ArenaC lokale Store-Summary, Import-Diagnostik, Reprocessing und Backup-Export auf Basis gespeicherter Raw Chunks
 - React-basierte MancuTG-ArenaC Application Shell mit Navigation, Setup-, Import-, History-, Collection-, Inventory-, Diagnostics-, Privacy- und Settings-Surfaces
+- ArenaC Privacy-/Settings-/Consent-Persistenz inkl. lokale Datenverwaltung und CLI-Steuerung
 - Archidekt read-only Connector
 - durchgehende TS-/Rust-/Python-Testabdeckung fuer diese Foundations
 
 ### Noch nicht produktvollstaendig
 
 - noch kein umfassender produktionsreifer MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
-- keine Privacy-/Settings-/Consent-Oberflaechen fuer MancuTG-ArenaC
 - keine gehärtete Archidekt-Read-only-MVP-Produktintegration
 - kein MVP-Release-Hardening fuer MancuTG-ArenaC
 - keine Review-Queue oder Korrekturprojektoren im Backend
@@ -277,6 +277,8 @@ Includes:
 - Sync/Archidekt/Telemetry opt-in
 - lokale Daten loeschen / exportieren
 - klare Anzeige, was lokal bleibt und was gesendet wuerde
+
+**Status:** im aktuellen Branch umgesetzt und gruen verifiziert
 
 ### Phase 8 — Archidekt read-only MVP hardening
 

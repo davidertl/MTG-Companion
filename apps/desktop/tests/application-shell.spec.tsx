@@ -65,6 +65,7 @@ describe("MancuTG-ArenaC application shell", () => {
     expect(html).toContain("Inventory");
     expect(html).toContain("Diagnostics");
     expect(html).toContain("Privacy");
+    expect(html).toContain("Wipe local data");
     expect(html).toContain("2 neue Sessions, 1 Duplikat");
   });
 });

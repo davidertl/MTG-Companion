@@ -10,6 +10,8 @@ describe("privacy center", () => {
     expect(state.modeLabel).toBe("Offline-only mode");
     expect(canSendNetworkRequest(settings, "updates")).toBe(true);
     expect(canSendNetworkRequest(settings, "telemetry")).toBe(false);
+    expect(state.archidektEnabled).toBe(false);
+    expect(state.localDataStays[0]).toContain("Raw logs");
   });
 
   it("clones allowed purposes so route state mutation does not leak back into settings", () => {

@@ -5,7 +5,15 @@ export function buildSettingsState(settings: PrivacySettings) {
     title: "Settings",
     syncEnabled: settings.syncEnabled,
     telemetryEnabled: settings.telemetryEnabled,
+    archidektEnabled: settings.allowedPurposes.includes("archidekt"),
     networkPurposes: [...settings.allowedPurposes],
     offlineCapable: true,
+    settingsFileName: "mancutg-arenac-settings.json",
+    actions: [
+      "Show settings",
+      "Set consent",
+      "Reset settings",
+      "Wipe local data",
+    ],
   };
 }

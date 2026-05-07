@@ -57,6 +57,7 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - inklusive iOS/iPadOS-Offline-Importflow fuer `.log`-Dateien per Drag & Drop oder Ordnerimport
   - Live-Log-Watcher mit Checkpoints, Partial-Line-Buffering und Rotation-/Truncation-Erkennung
   - lokale Store-Summary, Import-Diagnostik, Reprocessing und Backup-Export auf Basis gespeicherter Raw Chunks
+  - Privacy-/Settings-/Consent-Persistenz inkl. lokale Datenverwaltung und CLI-Steuerung
 - **MancuTG-backend-Grundlage**
   - `services/api/src` - optionale Sync-, Auth-, Archidekt-Import- und Telemetry-Services
   - `services/worker/src` - Hintergrundjob-Grundlage fuer serverseitige Verarbeitungsaufgaben

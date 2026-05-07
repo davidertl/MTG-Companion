@@ -4,7 +4,7 @@ use core_domain::{
 };
 use core_parser::parse_log_lossy;
 use core_store::{EventStore, IngestDiagnosticRecord, LogCheckpointRecord};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
@@ -60,6 +60,45 @@ pub struct LiveLogWatchSummary {
     pub rotation_detected: bool,
     pub truncation_detected: bool,
     pub pending_fragment_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArenaPrivacySettings {
+    pub telemetry_enabled: bool,
+    pub sync_enabled: bool,
+    pub allowed_purposes: Vec<String>,
+}
+
+impl Default for ArenaPrivacySettings {
+    fn default() -> Self {
+        Self {
+            telemetry_enabled: false,
+            sync_enabled: false,
+            allowed_purposes: vec!["updates".to_owned()],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArenaSettings {
+    pub privacy: ArenaPrivacySettings,
+}
+
+impl Default for ArenaSettings {
+    fn default() -> Self {
+        Self {
+            privacy: ArenaPrivacySettings::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalDataRemovalSummary {
+    pub removed_store_file: bool,
+    pub removed_settings_file: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -122,12 +161,25 @@ fn default_store_path() -> Result<PathBuf, String> {
         .map_err(|error| format!("failed to determine current directory: {error}"))
 }
 
+fn default_settings_path() -> Result<PathBuf, String> {
+    env::current_dir()
+        .map(|cwd| cwd.join("mancutg-arenac-settings.json"))
+        .map_err(|error| format!("failed to determine current directory: {error}"))
+}
+
 fn open_store(optional_store_path: Option<&str>) -> Result<EventStore, String> {
     let store_path = match optional_store_path {
         Some(path) => PathBuf::from(path),
         None => default_store_path()?,
     };
     EventStore::open(&store_path).map_err(|error| format!("failed to open store {}: {error}", store_path.display()))
+}
+
+fn resolve_settings_path(optional_settings_path: Option<&str>) -> Result<PathBuf, String> {
+    match optional_settings_path {
+        Some(path) => Ok(PathBuf::from(path)),
+        None => default_settings_path(),
+    }
 }
 
 pub fn bootstrap_local_companion(
@@ -311,6 +363,109 @@ pub fn export_backup_bundle(optional_store_path: Option<&str>) -> Result<BackupB
         unknown_events: summary.unknown_events,
         diagnostics: summary.diagnostics,
         checkpoints: summary.checkpoints,
+    })
+}
+
+pub fn load_arena_settings(optional_settings_path: Option<&str>) -> Result<ArenaSettings, String> {
+    let settings_path = resolve_settings_path(optional_settings_path)?;
+    if !settings_path.exists() {
+        return Ok(ArenaSettings::default());
+    }
+
+    let raw = fs::read_to_string(&settings_path)
+        .map_err(|error| format!("failed to read settings file {}: {error}", settings_path.display()))?;
+    serde_json::from_str(&raw)
+        .map_err(|error| format!("failed to parse settings file {}: {error}", settings_path.display()))
+}
+
+pub fn save_arena_settings(
+    settings: &ArenaSettings,
+    optional_settings_path: Option<&str>,
+) -> Result<PathBuf, String> {
+    let settings_path = resolve_settings_path(optional_settings_path)?;
+    let serialized = serde_json::to_string_pretty(settings)
+        .map_err(|error| format!("failed to serialize settings: {error}"))?;
+    fs::write(&settings_path, serialized)
+        .map_err(|error| format!("failed to write settings file {}: {error}", settings_path.display()))?;
+    Ok(settings_path)
+}
+
+pub fn set_consent(
+    purpose: &str,
+    enabled: bool,
+    optional_settings_path: Option<&str>,
+) -> Result<ArenaSettings, String> {
+    let mut settings = load_arena_settings(optional_settings_path)?;
+
+    match purpose {
+        "telemetry" => {
+            settings.privacy.telemetry_enabled = enabled;
+            update_allowed_purpose(&mut settings.privacy.allowed_purposes, "telemetry", enabled);
+        }
+        "sync" => {
+            settings.privacy.sync_enabled = enabled;
+            update_allowed_purpose(&mut settings.privacy.allowed_purposes, "sync", enabled);
+        }
+        "archidekt" => {
+            update_allowed_purpose(&mut settings.privacy.allowed_purposes, "archidekt", enabled);
+        }
+        "updates" => {
+            update_allowed_purpose(&mut settings.privacy.allowed_purposes, "updates", enabled);
+        }
+        other => {
+            return Err(format!("unknown consent purpose: {other}"));
+        }
+    }
+
+    if !settings.privacy.allowed_purposes.iter().any(|purpose| purpose == "updates") {
+        settings.privacy.allowed_purposes.push("updates".to_owned());
+    }
+    settings.privacy.allowed_purposes.sort();
+    settings.privacy.allowed_purposes.dedup();
+
+    save_arena_settings(&settings, optional_settings_path)?;
+    Ok(settings)
+}
+
+pub fn reset_arena_settings(optional_settings_path: Option<&str>) -> Result<ArenaSettings, String> {
+    let settings = ArenaSettings::default();
+    save_arena_settings(&settings, optional_settings_path)?;
+    Ok(settings)
+}
+
+pub fn wipe_local_data(
+    optional_store_path: Option<&str>,
+    optional_settings_path: Option<&str>,
+) -> Result<LocalDataRemovalSummary, String> {
+    let store_path = match optional_store_path {
+        Some(path) => PathBuf::from(path),
+        None => default_store_path()?,
+    };
+    let settings_path = resolve_settings_path(optional_settings_path)?;
+
+    let removed_store_file = if store_path.exists() {
+        fs::remove_file(&store_path)
+            .map_err(|error| format!("failed to remove store file {}: {error}", store_path.display()))?;
+        true
+    } else {
+        false
+    };
+
+    let removed_settings_file = if settings_path.exists() {
+        fs::remove_file(&settings_path).map_err(|error| {
+            format!(
+                "failed to remove settings file {}: {error}",
+                settings_path.display()
+            )
+        })?;
+        true
+    } else {
+        false
+    };
+
+    Ok(LocalDataRemovalSummary {
+        removed_store_file,
+        removed_settings_file,
     })
 }
 
@@ -635,8 +790,18 @@ fn max_consumed_sequence(a: u64, b: u64) -> u64 {
     if a > b { a } else { b }
 }
 
+fn update_allowed_purpose(allowed_purposes: &mut Vec<String>, purpose: &str, enabled: bool) {
+    if enabled {
+        if !allowed_purposes.iter().any(|candidate| candidate == purpose) {
+            allowed_purposes.push(purpose.to_owned());
+        }
+    } else {
+        allowed_purposes.retain(|candidate| candidate != purpose);
+    }
+}
+
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
+    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
 }
 
 pub fn run_cli(args: &[String]) -> Result<String, String> {
@@ -673,6 +838,35 @@ pub fn run_cli(args: &[String]) -> Result<String, String> {
             let result = export_backup_bundle(args.get(1).map(String::as_str))?;
             serde_json::to_string_pretty(&result)
                 .map_err(|error| format!("failed to serialize backup bundle: {error}"))
+        }
+        "show-settings" => {
+            let result = load_arena_settings(args.get(1).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize settings: {error}"))
+        }
+        "set-consent" => {
+            let purpose = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
+            let enabled = match args.get(2).map(String::as_str) {
+                Some("on") => true,
+                Some("off") => false,
+                _ => return Err(cli_usage().to_owned()),
+            };
+            let result = set_consent(purpose, enabled, args.get(3).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize settings: {error}"))
+        }
+        "reset-settings" => {
+            let result = reset_arena_settings(args.get(1).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize reset settings: {error}"))
+        }
+        "wipe-local-data" => {
+            let result = wipe_local_data(
+                args.get(1).map(String::as_str),
+                args.get(2).map(String::as_str),
+            )?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize wipe result: {error}"))
         }
         "import-ios-file" => {
             let log_path = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
