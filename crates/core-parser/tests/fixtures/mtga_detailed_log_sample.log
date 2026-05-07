@@ -1,0 +1,5 @@
+[UnityCrossThreadLogger]{"timestamp":"2026-05-07T00:00:00Z","eventName":"MatchGameRoomStateChanged","payload":{"state":"MatchCreated","matchId":"match-1","deck":"Esper Midrange","queue":"Ranked"}}
+[UnityCrossThreadLogger]{"timestamp":"2026-05-07T00:00:05Z","eventName":"PlayerInventory.GetPlayerCardsV3","payload":{"cardsOwned":620}}
+[UnityCrossThreadLogger]{"timestamp":"2026-05-07T00:00:06Z","eventName":"PlayerInventory.GetPlayerInventory","payload":{"gold":1200,"gems":400,"wildcards":12,"vault":34}}
+[UnityCrossThreadLogger]{"timestamp":"2026-05-07T00:00:07Z","eventName":"Draft.MakePick","payload":{"setCode":"OTJ","packNumber":1,"pickNumber":2,"choice":"Caustic Bronco"}}
+[UnityCrossThreadLogger]{"timestamp":"2026-05-07T00:00:08Z","eventName":"FuturePatchEvent","payload":{"foo":"bar"}}

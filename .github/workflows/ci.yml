@@ -41,6 +41,9 @@ jobs:
       - name: TypeScript tests
         run: npm run test:ts
 
+      - name: API smoke test
+        run: npm run api:smoke
+
       - name: Rust tests
         run: cargo test --workspace
 

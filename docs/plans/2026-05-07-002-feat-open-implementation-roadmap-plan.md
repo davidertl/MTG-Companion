@@ -9,7 +9,7 @@ date: 2026-05-07
 
 ## Summary
 
-Dieses Dokument fasst den aktuellen Implementierungsstand von MancuTG-Companion zusammen und listet die noch offenen Arbeiten in einer umsetzbaren Reihenfolge auf. Es dient als Konsolidierungsplan ueber MancuTG-ArenaC, MancuTG-backend und MancuTG-PaperC hinweg, damit die naechsten Schritte nicht als isolierte Einzelaufgaben, sondern als zusammenhaengende Roadmap umgesetzt werden.
+Dieses Dokument fasst den aktuellen Implementierungsstand von MancuTG-Companion zusammen und priorisiert die noch offenen Arbeiten neu. MancuTG-ArenaC wird als erstes vollstaendiges Produkt bis zum MVP-/Release-Stand vorgezogen; MancuTG-PaperC bleibt bis dahin bewusst auf Contract-/Skeleton-Niveau. Das Dokument dient damit als Konsolidierungsplan ueber MancuTG-ArenaC, MancuTG-backend und MancuTG-PaperC hinweg, ohne die ArenaC-MVP-Prioritaet zu verlieren.
 
 ---
 
@@ -17,7 +17,7 @@ Dieses Dokument fasst den aktuellen Implementierungsstand von MancuTG-Companion 
 
 Der aktuelle Stand des Repos ist deutlich ueber einer reinen Foundations-Basis: gemeinsame Event-/Session-Vertraege, ein startbarer MancuTG-backend-Server, iOS-Offline-Import in MancuTG-ArenaC, PaperC-spezifische Event-/Tournament-/Media-Vertraege sowie file-basierte Persistenz sind bereits vorhanden. Gleichzeitig fehlen noch die Schichten, die aus diesen Foundations ein vollstaendiges Produkt machen: echte GUI-Oberflaechen, PaperC-Clientpfade, Review-/Projektionslogik, Worker-Partitionierung fuer gleichzeitige Spiele, relationale Persistenz, Auth und nutzbare Abfrage-APIs.
 
-Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endnutzer, Turnierbetrieb und laengerfristigen Serverbetrieb nur teilweise nutzbar. Die zentrale Aufgabe ist deshalb jetzt nicht mehr „ob“ MancuTG-Companion technisch moeglich ist, sondern **welche offenen Implementierungen in welcher Reihenfolge den groessten Produktfortschritt liefern**.
+Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endnutzer, Turnierbetrieb und laengerfristigen Serverbetrieb nur teilweise nutzbar. Gleichzeitig waere es strategisch falsch, MancuTG-PaperC bereits in umfangreiche Detection-, Review-, Tournament- oder Worker-Logik auszubauen, bevor MancuTG-ArenaC als erstes Produkt stabil ist. Die zentrale Aufgabe ist deshalb jetzt nicht mehr „ob“ MancuTG-Companion technisch moeglich ist, sondern **wie ArenaC zuerst produktreif abgeschlossen und PaperC bis dahin bewusst schlank gehalten wird**.
 
 ---
 
@@ -44,8 +44,14 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 
 ### Noch nicht produktvollstaendig
 
+- kein echter MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
+- kein Live-Log-Watcher mit Checkpointing fuer MancuTG-ArenaC
 - keine echte Tauri-/React-Oberflaeche fuer MancuTG-ArenaC
-- kein PaperC-Client-Skelett mit Capture-/Emit-/Review-Frontdoor
+- keine vollstaendigen lokalen Read Models / Export-/Reprocessing-Flows fuer reale MTGA-Logs
+- keine Privacy-/Settings-/Consent-Oberflaechen fuer MancuTG-ArenaC
+- keine gehärtete Archidekt-Read-only-MVP-Produktintegration
+- kein MVP-Release-Hardening fuer MancuTG-ArenaC
+- kein minimales PaperC-Client-Skelett zur echten Contract-Validierung
 - keine Review-Queue oder Korrekturprojektoren im Backend
 - keine Turnier-/Match-Projektoren fuer mehrere gleichzeitige Spiele
 - keine echte Worker-Laufzeit fuer Detection/Review/Finalize
@@ -58,49 +64,50 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 
 ## Remaining Implementations
 
-Die noch offenen Implementierungen gruppieren sich in acht Bloecke:
+Die noch offenen Implementierungen werden ab jetzt in dieser Prioritaet behandelt:
 
-1. **MancuTG-ArenaC GUI / App-Shell**
-   - Tauri-Windowing
-   - React-Routen auf den existierenden Desktop-State binden
-   - Datei-/Ordner-Picker fuer lokale Logs und iOS-Import
+1. **U0 Repository verification and CI hardening**
+   - Toolchain/README/CI als verlaessliche Basis
 
-2. **MancuTG-PaperC Client Skeleton**
-   - App-Skelett unter `apps/paperc/`
-   - Capture-Session-Erstellung
-   - Eventemission gegen `/events`
-   - Media-Session-Erstellung gegen `/media/sessions`
+2. **U1a Shared backend contract stabilization**
+   - gemeinsame Contracts, Dedupe, Idempotenz, API-Haertung
 
-3. **Review-/Correction-Backend**
-   - Review-Routen
-   - Review-Queue-State
-   - Review-/Correction-/Finalization-Projektoren
+3. **U2 Minimal MancuTG-PaperC contract skeleton**
+   - nur Contract-/Client-Skeleton, keine produktive Video-/Reviewlogik
 
-4. **Tournament / Concurrent Game Runtime**
-   - `matchStreamKey`
-   - Partitionierung fuer mehrere gleichzeitige Tische/Spiele
-   - Worker-Runtime fuer Detect / Review / Finalize
+4. **U1b ArenaC real MTGA detailed-log parser**
+   - echter MTGA-Detailed-Log-Korpus und Parser-Haertung
 
-5. **Persistente Server-Schicht**
-   - Wechsel von file-backed JSON zu relationaler Persistenz
-   - Session-/Event-/Media-Tabellen
-   - Idempotenz-/Cursor-Speicherung
+5. **U1c ArenaC live watcher and checkpointing**
+   - inkrementelles Beobachten realer Logs
 
-6. **Auth / Roles / Permissions**
-   - ingest devices
-   - reviewers / judges
-   - admins / tournament operators
+6. **U1d ArenaC local read models, export and reprocessing**
+   - lokale produktreife Datenansichten und Export
 
-7. **Read APIs / Replay / Queries**
-   - Match-/Round-/Tournament-Abfragen
-   - Replay-/Timeline-Abfragen
-   - Query-Endpunkte fuer ArenaC und PaperC
+7. **U1 MancuTG-ArenaC application shell**
+   - echte Tauri-/React-UI
 
-8. **Produktoberflaechen nach dem Kern**
-   - Web profile / sharing
-   - Team-/Coach-Funktionen
-   - MancuTG-ArenaC Overlay/HUD
-   - bidirektionale Archidekt-Flows
+8. **U1e ArenaC privacy, settings and consent enforcement**
+   - Privacy Center und Settings als echte Produktflaeche
+
+9. **U1f Archidekt read-only MVP hardening**
+   - produktionsnahe Read-only Integration
+
+10. **U1g ArenaC MVP polish and release hardening**
+    - Packaging, Smoke, Nutzerdoku
+
+11. **Deferred PaperC Phase A — Review & Correction Backend**
+12. **Deferred PaperC Phase B — Concurrent Game Runtime**
+13. **Deferred PaperC Phase C — Relational Backend Persistence**
+14. **Deferred PaperC Phase D — Auth / Roles / Permissions**
+15. **Deferred PaperC Phase E — Read APIs / Replay / Tournament Queries**
+16. **Deferred PaperC Phase F — Detection / Video Pipeline**
+17. **Later Product Expansions**
+    - MancuTG-ArenaC Overlay/HUD
+    - Web profile / sharing
+    - Team-/Coach-Funktionen
+    - bidirektionale Archidekt-Flows
+    - Broadcast/Replay UX
 
 ---
 
@@ -109,8 +116,8 @@ Die noch offenen Implementierungen gruppieren sich in acht Bloecke:
 - R1. Die offenen Implementierungen muessen ueber ArenaC, backend und PaperC konsistent und priorisiert aufgelistet werden.
 - R2. Der Plan muss zwischen bereits funktionalen Foundations und noch fehlenden Produktflaechen unterscheiden.
 - R3. Die naechsten Schritte muessen eine sinnvolle Lieferreihenfolge haben, die auf dem aktuellen Repozustand aufbaut.
-- R4. MancuTG-backend muss frueh fuer Review, Parallelitaet und relationale Persistenz vorbereitet werden, bevor aufwaendige UI- oder Modellarbeit zu viele Annahmen festbrennt.
-- R5. MancuTG-PaperC muss als echter Clientpfad priorisiert werden, weil die bestehenden Shared Contracts sonst ungenutzt bleiben.
+- R4. MancuTG-backend darf frueh nur soweit ausgebaut werden, wie ArenaC-MVP und gemeinsame Contracts es benoetigen; umfangreiche PaperC-Betriebslogik wird bewusst nach hinten verschoben.
+- R5. MancuTG-PaperC muss vor ArenaC-MVP nur als minimales Contract-Skeleton eingeplant werden, nicht als vollwertige Produktimplementierung.
 - R6. Die Roadmap darf die vorhandenen Offline-first-, read-only- und app-uebergreifenden Eventinvarianten nicht verletzen.
 
 ---
@@ -130,11 +137,11 @@ Die noch offenen Implementierungen gruppieren sich in acht Bloecke:
 
 ## Key Technical Decisions
 
-- **Backend vor UI-Schmuck:** MancuTG-backend muss zuerst Review-, Parallelitaets- und Persistenzgrenzen sauber bekommen, bevor MancuTG-ArenaC- oder MancuTG-PaperC-UIs zu viele Workflowannahmen verfestigen.
-- **PaperC frueh, aber schlank:** Ein minimales `apps/paperc/`-Skelett ist wichtiger als sofortige komplexe Visionarbeit, weil es die Shared Contracts real nutzbar macht.
-- **JSON-Store ist nur Zwischenstation:** Die file-basierte Persistenz war der richtige Foundations-Schritt, darf aber nicht Endzustand fuer Multi-Game-/Reviewbetrieb bleiben.
-- **Projektoren sind der Wahrheitsort:** Review-, Korrektur- und Turnierzustand gehoeren in Projektionen; rohe Events bleiben append-only.
-- **ArenaC- und PaperC-Paritaet auf Contract-Ebene vor UI-Paritaet:** Bevor beide Produkte visuell ausgearbeitet werden, muessen sie denselben Session-/Event-/Media-Kern wirklich nutzen.
+- **ArenaC zuerst produktreif:** MancuTG-ArenaC bekommt Prioritaet bis zum MVP-/Release-Stand.
+- **PaperC nur als Contract-/Skeleton-Level vor ArenaC-MVP:** Keine fruehe Detection-, Worker-, Review- oder Tournament-Produktlogik fuer PaperC.
+- **Backend nur soweit frueh, wie ArenaC und Shared Contracts es brauchen:** Keine ueberfruehe Backend-Komplexitaet nur fuer spaetere PaperC-Faelle.
+- **JSON-Store bleibt Zwischenstation:** relationale Persistenz wird erst nach ArenaC-MVP oder bei echtem PaperC-Betrieb vorgezogen.
+- **Projektoren bleiben der Wahrheitsort:** Review-, Korrektur- und Turnierzustand gehoeren spaeter in Projektionen; rohe Events bleiben append-only.
 
 ---
 
@@ -160,68 +167,307 @@ flowchart LR
 
 ## Phased Delivery
 
-### Phase 1 — Use the existing contracts in real client flows
+### Phase 0 — Repository verification and CI hardening
 
-**Goal:** MancuTG-ArenaC and MancuTG-PaperC should both drive the backend through real product entrypoints.
-
-Includes:
-- MancuTG-ArenaC Tauri/React shell
-- local log and iOS import UI binding
-- `apps/paperc/` skeleton
-- `/events` + `/media/sessions` usage from PaperC client code
-
-Why first:
-- validates current contracts end-to-end
-- exposes UX and contract gaps early
-- avoids overbuilding backend workflows nobody can exercise yet
-
-### Phase 2 — Review and tournament truth
-
-**Goal:** make PaperC eventing operationally safe.
+**Goal:** Sicherstellen, dass der aktuelle Branch reproduzierbar gebaut, getestet und dokumentiert werden kann.
 
 Includes:
-- review queue routes
-- correction/finalization routes
-- review/correction/tournament projectors
-- worker partitioning via `matchStreamKey`
+- Toolchain-Dokumentation fuer Node, Rust, Python
+- `npm ci`
+- TypeScript-, Rust- und Python-Tests
+- API-Server-Smoke-Test
+- CI-Workflow-Pruefung
+- README-Kommandos gegen echten Repo-Zustand verifizieren
 
-Why second:
-- concurrent games become meaningful only when detections can be reviewed and projected safely
+### Phase 1 — Shared backend contract stabilization
 
-### Phase 3 — Production-grade backend persistence
-
-**Goal:** replace file-backed runtime with durable multi-process storage.
-
-Includes:
-- relational persistence
-- sessions/events/media tables
-- idempotency tables
-- cursor / pull-sync groundwork
-
-Why third:
-- once client and review flows stabilize, storage can be normalized against real usage
-
-### Phase 4 — Read models and replay APIs
-
-**Goal:** expose the captured state back to products and users.
+**Goal:** Die app-uebergreifenden Contracts zwischen ArenaC, PaperC und backend sauber halten, ohne PaperC bereits produktiv auszubauen.
 
 Includes:
-- match query API
-- round/tournament query API
-- replay/timeline API
-- PaperC and ArenaC consumer adapters
+- Event-/Session-Batchvertraege pruefen und haerten
+- Dedupe-/Idempotenzverhalten absichern
+- Media-Session-Vertraege beibehalten
+- Backend-Endpunkte `/events`, `/media/sessions`, `/sync`, `/health` stabil halten
 
-### Phase 5 — Product expansions
+### Phase 2 — Minimal MancuTG-PaperC contract skeleton
+
+**Goal:** PaperC nur soweit anlegen, dass die gemeinsamen Schnittstellen real validiert werden koennen.
 
 Includes:
-- overlay/HUD
-- sharing/web/team features
-- richer Archidekt flows
-- broadcast/replay UX
+- `apps/paperc/` minimal anlegen
+- Capture Session Builder
+- Media Session Request Builder
+- PaperC Event Builder
+- Tournament Context Builder
+- optionale einfache CLI-/Test-Emitter
+
+Explicitly not included:
+- keine Videoverarbeitung
+- keine Detection Pipeline
+- keine Review Queue
+- keine Tournament Projectors
+- keine Worker Runtime
+
+### Phase 3 — ArenaC real MTGA detailed-log parser
+
+**Goal:** ArenaC muss echte MTGA-Detailed-Logs verlaesslich verarbeiten koennen.
+
+Includes:
+- realistische MTGA-Detailed-Log-Beispiele als Testkorpus
+- Golden Tests
+- Parser-Erweiterung von Demoformat auf reale Logstrukturen
+- parserVersion / Unknown-Event-Handling / Reprocessing-Grundlage
+
+### Phase 4 — ArenaC live watcher and checkpointing
+
+**Goal:** ArenaC wird vom Import-Tool zum echten Companion.
+
+Includes:
+- Live File Watcher
+- inkrementelles Lesen
+- persistente Checkpoints
+- Log-Rotation / Truncation / Restart-Verhalten
+
+### Phase 5 — ArenaC local read models, export and reprocessing
+
+**Goal:** ArenaC soll lokal-first nutzbare Datenansichten bieten.
+
+Includes:
+- lokale Match-/Collection-/Inventory-/Draft-Queries
+- Export JSON/CSV/optional Backup
+- Reprocessing bestehender Raw Chunks
+- Unknown-Event-/Import-Fehlerdiagnose
+
+### Phase 6 — MancuTG-ArenaC application shell
+
+**Goal:** ArenaC bekommt eine echte nutzbare Desktop-Oberflaeche.
+
+Includes:
+- Tauri/React App Shell
+- Setup Wizard
+- Log Path Detection / Picker
+- Live Watcher Start/Stop
+- iOS File/Folder Import
+- Import Center
+- Dashboard / History / Collection / Inventory / Draft / Export UI
+
+### Phase 7 — ArenaC privacy, settings and consent enforcement
+
+**Goal:** Offline-first und Datenschutz werden echte Produktflaechen.
+
+Includes:
+- Privacy Center UI
+- Settings Persistenz
+- Sync/Archidekt/Telemetry opt-in
+- lokale Daten loeschen / exportieren
+- klare Anzeige, was lokal bleibt und was gesendet wuerde
+
+### Phase 8 — Archidekt read-only MVP hardening
+
+**Goal:** Den vorhandenen Connector als read-only MVP sauber nutzbar machen.
+
+Includes:
+- echter Runtime-Fetcher
+- Fehlerbehandlung
+- Cache-/TTL-Entscheidungen
+- ArenaC Import UI
+- lokale Snapshot-Speicherung
+
+### Phase 9 — ArenaC MVP polish and release hardening
+
+**Goal:** ArenaC wird als erstes Produkt veroeffentlichungsfaehig.
+
+Includes:
+- Windows/macOS Build- und Bundle-Pruefung
+- Smoke Tests auf frischem System
+- Nutzer-README / Installationspfade
+- Known Issues / Release Checklist
+
+### Deferred PaperC Phase A — Review & Correction Backend
+
+### Deferred PaperC Phase B — Concurrent Game Runtime
+
+### Deferred PaperC Phase C — Relational backend persistence
+
+### Deferred PaperC Phase D — Auth / Roles / Permissions
+
+### Deferred PaperC Phase E — Read APIs / Replay / Tournament Queries
+
+### Deferred PaperC Phase F — Detection / Video Pipeline
+
+### Later product expansions
+
+- MancuTG-ArenaC Overlay/HUD
+- Web profile / sharing
+- Team-/Coach-Funktionen
+- bidirektionale Archidekt-Flows
+- Broadcast/Replay UX
 
 ---
 
 ## Implementation Units
+
+- U0. **Repository verification and CI hardening**
+
+**Goal:** Toolchain, CI und README als belastbare Ausgangsbasis sichern.
+
+**Requirements:** R1, R2, R3, R6
+
+**Dependencies:** None
+
+**Files:**
+- Modify: `.github/workflows/ci.yml`
+- Modify: `README.md`
+- Modify: `package.json`
+
+**Approach:**
+- Existierende Kommandos, Tests und CI-Schritte gegen den echten Repozustand pruefen.
+- API-Smoke und Rust-Absicherung in CI explizit halten.
+
+**Test scenarios:**
+- Happy path: alle vorhandenen Checks laufen lokal und in CI.
+- Error path: README-Kommandos driften nicht vom echten Projektzustand.
+
+**Verification:**
+- CI ist verlasslicher Qualitaets-Gate.
+
+---
+
+- U1a. **Shared backend contract stabilization**
+
+**Goal:** Die gemeinsamen backendseitigen Contracts stabil halten, ohne PaperC zu weit vorzuziehen.
+
+**Requirements:** R1, R3, R4, R6
+
+**Dependencies:** U0
+
+**Files:**
+- Modify: `packages/shared-schema/src/`
+- Modify: `services/api/src/routes/`
+- Modify: `services/api/tests/`
+
+**Approach:**
+- Event-/Session-/Media-Vertraege stabilisieren.
+- Keine komplexe PaperC-Produktlogik, nur Contract-Haertung.
+
+**Test scenarios:**
+- Happy path: ArenaC- und PaperC-Skeleton-Payloads validieren.
+- Edge case: Dedupe/Idempotenz bleiben stabil.
+
+**Verification:**
+- backendseitige Contracts sind fuer beide Apps verlässlich.
+
+---
+
+- U2. **Minimal MancuTG-PaperC contract skeleton**
+
+**Goal:** MancuTG-PaperC nur als minimales Contract-Skeleton anlegen.
+
+**Requirements:** R1, R3, R5, R6
+
+**Dependencies:** U1a
+
+**Files:**
+- Create: `apps/paperc/src/index.ts`
+- Create: `apps/paperc/src/capture/`
+- Create: `apps/paperc/src/events/`
+- Create: `apps/paperc/src/tournaments/`
+- Test: `apps/paperc/tests/paperc-event-emission.spec.ts`
+
+**Approach:**
+- Nur Builder / Skeleton / Contract-Validation.
+- Keine Detection-, Review-, Worker- oder Tournament-Produktlogik.
+
+**Test scenarios:**
+- Happy path: PaperC erzeugt gueltige Session-/Event-/Media-Requests.
+- Error path: ohne Turnierkontext kein sendbarer Request.
+
+**Verification:**
+- PaperC validiert die Shared Contracts real, bleibt aber bewusst duenn.
+
+---
+
+- U1b. **ArenaC real MTGA detailed-log parser**
+
+**Goal:** Den ArenaC-Parser von Demo-/synthetischem Format auf reale MTGA-Detailed-Logs ausrichten.
+
+**Requirements:** R2, R3, R6
+
+**Dependencies:** U1a
+
+**Files:**
+- Modify: `crates/core-parser/src/`
+- Create: `crates/core-parser/tests/fixtures/`
+- Modify: `crates/core-parser/tests/golden_logs.rs`
+
+**Approach:**
+- realistische MTGA-Detailed-Log-Fragmente als Korpus aufbauen.
+- Parser schrittweise auf reale Logstrukturen erweitern.
+- Unknown-Event-Pfad beibehalten.
+
+**Execution note:** Add characterization coverage before widening parser behavior.
+
+**Test scenarios:**
+- Happy path: reale Match-/Inventory-/Draft-nahe Log-Fragmente werden erkannt.
+- Edge case: teilweise unbekannte Abschnitte bleiben recoverable.
+- Error path: kaputte Fragmente brechen nicht den ganzen Importpfad.
+
+**Verification:**
+- ArenaC verarbeitet nicht nur Demoformat, sondern echte MTGA-Detailed-Logs.
+
+---
+
+- U1c. **ArenaC live watcher and checkpointing**
+
+**Goal:** ArenaC vom Import-Tool zum echten Live-Companion machen.
+
+**Requirements:** R2, R3, R6
+
+**Dependencies:** U1b
+
+**Files:**
+- Modify: `apps/desktop/src-tauri/src/`
+- Test: `apps/desktop/src-tauri/tests/`
+
+**Approach:**
+- Live-Watcher, Checkpoints, Log-Rotation und Restart-Verhalten explizit modellieren.
+
+**Test scenarios:**
+- Happy path: Append nach Checkpoint.
+- Edge case: Rotation/Truncation.
+- Error path: invalider Pfad / leere Datei / teilweise Logzeilen.
+
+**Verification:**
+- ArenaC beobachtet reale Logs robust ohne Duplikate.
+
+---
+
+- U1d. **ArenaC local read models, export and reprocessing**
+
+**Goal:** ArenaC lokal-first voll nutzbar machen.
+
+**Requirements:** R2, R3, R6
+
+**Dependencies:** U1c
+
+**Files:**
+- Modify: `apps/desktop/src/`
+- Modify: `apps/desktop/tests/`
+- Modify: `crates/core-store/`
+
+**Approach:**
+- Query-Layer fuer lokale Match-/Collection-/Inventory-/Draft-Daten vervollstaendigen.
+- Export und Reprocessing produktnah machen.
+
+**Test scenarios:**
+- Happy path: lokale Queries.
+- Happy path: Export JSON/CSV.
+- Edge case: Reprocessing ueber vorhandene Raw Chunks.
+
+**Verification:**
+- ArenaC ist lokal ohne Backend sinnvoll nutzbar.
+
+---
 
 - U1. **MancuTG-ArenaC application shell**
 
@@ -229,7 +475,7 @@ Includes:
 
 **Requirements:** R2, R3, R6
 
-**Dependencies:** None
+**Dependencies:** U1d
 
 **Files:**
 - Create: `apps/desktop/src/app/`
@@ -257,41 +503,85 @@ Includes:
 
 ---
 
-- U2. **MancuTG-PaperC client skeleton**
+- U1e. **ArenaC privacy, settings and consent enforcement**
 
-**Goal:** MancuTG-PaperC als echten Clientpfad anschliessen.
+**Goal:** Privacy-/Consent-Grenzen als echte MancuTG-ArenaC-Produktflaechen ausrollen.
 
-**Requirements:** R1, R3, R5, R6
+**Requirements:** R2, R3, R4, R6
 
-**Dependencies:** None
+**Dependencies:** U1
 
 **Files:**
-- Create: `apps/paperc/src/index.ts`
-- Create: `apps/paperc/src/capture/`
-- Create: `apps/paperc/src/events/`
-- Create: `apps/paperc/src/tournaments/`
-- Test: `apps/paperc/tests/paperc-event-emission.spec.ts`
+- Modify: `apps/desktop/src/routes/privacy/`
+- Modify: `apps/desktop/src/routes/settings/`
+- Modify: `apps/desktop/tests/`
 
 **Approach:**
-- Noch keine volle Vision-Pipeline, aber Capture-/Session-/Emit-Struktur.
-- `/events` und `/media/sessions` direkt nutzen.
-
-**Patterns to follow:**
-- `apps/desktop/src/index.ts`
-- `packages/shared-schema/src/paperc.ts`
-- `packages/shared-schema/src/media.ts`
+- Sync/Archidekt/Telemetry opt-in explizit in UI und Persistenz abbilden.
 
 **Test scenarios:**
-- Happy path: PaperC erzeugt gueltige Session-/Event-/Media-Requests.
-- Edge case: unterschiedliche Capture-Sessions erzeugen unterschiedliche Streamidentitaeten.
-- Error path: ohne Turnier-/Matchkontext kein sendbarer Request.
+- Happy path: Standardzustand bleibt lokal/offline.
+- Error path: keine unautorisierten Netzwerkpfade.
 
 **Verification:**
-- MancuTG-PaperC ist als Clientpfad nicht mehr nur dokumentiert, sondern lauffaehig angeschlossen.
+- Datenschutz ist Produktverhalten, nicht nur Doku.
 
 ---
 
-- U3. **Review and correction backend**
+- U1f. **Archidekt read-only MVP hardening**
+
+**Goal:** Die vorhandene Archidekt-Integration fuer ArenaC produktnah absichern.
+
+**Requirements:** R3, R4, R6
+
+**Dependencies:** U1e
+
+**Files:**
+- Modify: `services/archidekt-connector/`
+- Modify: `services/api/src/routes/integrations/archidekt/`
+- Modify: `apps/desktop/src/routes/decks/`
+- Modify: `apps/desktop/tests/`
+
+**Approach:**
+- echten Produktpfad statt Dummy-/Demo-Integration sichern.
+- Fehler und Cache-Verhalten klar abbilden.
+
+**Test scenarios:**
+- Happy path: read-only Deckimport.
+- Error path: Netzwerk-/RateLimit-/NotFound-Faelle.
+- Edge case: lokale Offline-Verfuegbarkeit nach Import.
+
+**Verification:**
+- Archidekt ist als read-only MVP fuer ArenaC nutzbar.
+
+---
+
+- U1g. **ArenaC MVP polish and release hardening**
+
+**Goal:** MancuTG-ArenaC als erstes veroeffentlichungsfaehiges Produkt absichern.
+
+**Requirements:** R2, R3, R6
+
+**Dependencies:** U1f
+
+**Files:**
+- Modify: `README.md`
+- Modify: `.github/workflows/ci.yml`
+- Create: `docs/release/` 
+
+**Approach:**
+- Bundling, Startup ohne Dev-Umgebung, Installationspfade und Known Issues zusammenziehen.
+
+**Test scenarios:**
+- Happy path: Build- und Startup-Smokes.
+- Error path: Dokumentation passt zu Build-/Run-Reality.
+
+**Verification:**
+- ArenaC ist als erstes Produkt real test- und veroeffentlichbar.
+
+---
+
+- Deferred PaperC Phase A. **Review and correction backend**
 
 **Goal:** Unsichere oder widerspruechliche PaperC-Detektionen sicher verarbeiten.
 
@@ -324,13 +614,13 @@ Includes:
 
 ---
 
-- U4. **Concurrent game runtime and projectors**
+- Deferred PaperC Phase B. **Concurrent game runtime and projectors**
 
 **Goal:** Mehrere gleichzeitige Tische/Spiele robust ueber MancuTG-backend verarbeiten.
 
 **Requirements:** R1, R3, R4, R6
 
-**Dependencies:** U3
+**Dependencies:** Deferred PaperC Phase A
 
 **Files:**
 - Create: `services/worker/src/paperc/`
@@ -357,13 +647,13 @@ Includes:
 
 ---
 
-- U5. **Relational backend persistence**
+- Deferred PaperC Phase C. **Relational backend persistence**
 
 **Goal:** Die JSON-Store-Zwischenstufe auf dauerhafte relationale Persistenz heben.
 
 **Requirements:** R1, R3, R4, R6
 
-**Dependencies:** U3, U4
+**Dependencies:** Deferred PaperC Phase A, Deferred PaperC Phase B
 
 **Files:**
 - Create: `services/api/src/domain/persistence/`
@@ -389,13 +679,13 @@ Includes:
 
 ---
 
-- U6. **Read APIs and replay/query surfaces**
+- Deferred PaperC Phase E. **Read APIs and replay/query surfaces**
 
 **Goal:** Die gespeicherten Daten wieder fuer Produkte nutzbar machen.
 
 **Requirements:** R2, R3, R6
 
-**Dependencies:** U3, U4, U5
+**Dependencies:** Deferred PaperC Phase A, Deferred PaperC Phase B, Deferred PaperC Phase C
 
 **Files:**
 - Create: `services/api/src/routes/matches/`
@@ -418,12 +708,34 @@ Includes:
 
 ---
 
+## New Priority Order
+
+1. U0 Repository verification and CI hardening
+2. U1a Shared backend contract stabilization
+3. U2 Minimal MancuTG-PaperC contract skeleton
+4. U1b ArenaC real MTGA detailed-log parser
+5. U1c ArenaC live watcher and checkpointing
+6. U1d ArenaC local read models, export and reprocessing
+7. U1 MancuTG-ArenaC application shell
+8. U1e ArenaC privacy, settings and consent enforcement
+9. U1f Archidekt read-only MVP hardening
+10. U1g ArenaC MVP polish and release hardening
+11. Deferred PaperC Phase A — Review & Correction Backend
+12. Deferred PaperC Phase B — Concurrent Game Runtime
+13. Deferred PaperC Phase C — Relational Backend Persistence
+14. Deferred PaperC Phase D — Auth / Roles / Permissions
+15. Deferred PaperC Phase E — Read APIs / Replay / Tournament Queries
+16. Deferred PaperC Phase F — Detection / Video Pipeline
+17. Later Product Expansions
+
+---
+
 ## System-Wide Impact
 
-- **Interaction graph:** ArenaC, PaperC, backend projectors, review flows and media ingest all converge on one backend domain model.
-- **Error propagation:** Schema-, session-, and stream-validation must fail early so bad ingest does not poison downstream projections.
-- **State lifecycle risks:** the biggest remaining risks are still review correctness, multi-stream ordering, and moving from file-backed persistence to production persistence.
-- **API surface parity:** `/events` and `/media/sessions` remain the shared cross-app foundation; future routes should build on projections, not bypass the model.
+- **Interaction graph:** ArenaC reaches MVP first while PaperC remains a contract-validating skeleton on the same backend foundations.
+- **Error propagation:** Parser-, watcher-, and UI-errors in ArenaC must be solved before backend and PaperC complexity scales further.
+- **State lifecycle risks:** the highest near-term risks are still parser correctness, watcher duplication, consent gating, and release hardening for ArenaC.
+- **API surface parity:** `/events` and `/media/sessions` remain the shared cross-app foundation, but PaperC product logic is intentionally deferred.
 - **Unchanged invariants:** ArenaC remains local-first; PaperC remains a separate app; backend remains optional for ArenaC-only local use.
 
 ---
@@ -432,19 +744,19 @@ Includes:
 
 | Risk | Mitigation |
 |------|------------|
-| UI work drifts from backend contracts | bind UI to shared schema exports and integration tests early |
-| PaperC client invents its own semantics | keep `paperc.ts`, `tournaments.ts`, and `media.ts` as single sources of truth |
-| JSON store becomes a hidden production dependency | prioritize relational persistence before heavy tournament rollout |
-| Review workflow stays underspecified | implement review/correction projectors before broad PaperC capture expansion |
-| Multi-stream runtime complexity grows faster than tests | add concurrent-game tests before scaling worker logic |
+| ArenaC MVP slips while PaperC complexity grows too early | hard-prioritize ArenaC parser, watcher, UI, privacy and release work first |
+| PaperC client invents its own semantics | keep `paperc.ts`, `tournaments.ts`, and `media.ts` as single sources of truth and keep PaperC skeleton-thin |
+| Real MTGA logs differ from synthetic assumptions | build a real Detailed-Log corpus and golden tests before UI polish |
+| JSON store becomes a hidden production dependency | defer relational persistence explicitly and avoid treating the JSON store as final architecture |
+| Review/runtime complexity grows before ArenaC is stable | defer PaperC review, worker, tournament and detection phases until ArenaC MVP is complete |
 
 ---
 
 ## Documentation / Operational Notes
 
-- README should be updated whenever a new end-user-visible product path becomes real.
+- README should be updated whenever a new end-user-visible ArenaC path becomes real.
 - Once relational persistence lands, the architecture and privacy docs should stop presenting the file-backed store as the primary runtime shape.
-- The next implementation plan after this roadmap should likely target **U2 + U3 together**, because PaperC capture without review semantics is unsafe.
+- The next implementation work after this roadmap should start with **U0 + U1a + U2 + U1b**, not with PaperC review/runtime phases.
 
 ---
 

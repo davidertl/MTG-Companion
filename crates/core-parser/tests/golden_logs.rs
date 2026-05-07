@@ -1,5 +1,6 @@
 use core_domain::{EventType, payload_value};
 use core_parser::parse_log;
+use std::fs;
 
 #[test]
 fn parses_known_and_unknown_events_from_a_golden_log() {
@@ -54,4 +55,33 @@ fn skips_blank_lines_and_reports_invalid_segments() {
     let message = error.to_string();
     assert!(message.contains("invalid log line"));
     assert!(message.contains("sequence 1"));
+}
+
+#[test]
+fn parses_representative_mtga_detailed_log_fragments() {
+    let log = fs::read_to_string("tests/fixtures/mtga_detailed_log_sample.log")
+        .expect("fixture log should be readable");
+
+    let report = parse_log("session-mtga", &log, 0).expect("mtga-like detailed log should parse");
+
+    assert_eq!(report.events.len(), 5);
+    assert_eq!(report.events[0].event_type, EventType::MatchStart);
+    assert_eq!(
+        payload_value(&report.events[0].payload, "deck").as_deref(),
+        Some("Esper Midrange"),
+    );
+    assert_eq!(report.events[1].event_type, EventType::CollectionSnapshot);
+    assert_eq!(
+        payload_value(&report.events[2].payload, "gold").as_deref(),
+        Some("1200"),
+    );
+    assert_eq!(report.events[3].event_type, EventType::DraftPick);
+    assert_eq!(
+        payload_value(&report.events[3].payload, "choice").as_deref(),
+        Some("Caustic Bronco"),
+    );
+    assert_eq!(
+        report.events[4].event_type,
+        EventType::Unknown("FuturePatchEvent".to_owned()),
+    );
 }

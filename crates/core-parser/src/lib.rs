@@ -1,4 +1,5 @@
 use core_domain::{EventType, NormalizedEvent, ParseReport, RawChunk};
+use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
@@ -78,6 +79,12 @@ pub fn parse_log_lossy(session_id: &str, input: &str, starting_offset: u64) -> L
 }
 
 fn parse_line(session_id: &str, sequence: u64, line: &str) -> Result<NormalizedEvent, ParseError> {
+    if let Some(json_start) = line.find('{') {
+        if let Ok(value) = serde_json::from_str::<Value>(&line[json_start..]) {
+            return parse_mtga_json_line(session_id, sequence, line, value);
+        }
+    }
+
     let mut segments = line.split('|');
     let timestamp = segments
         .next()
@@ -111,6 +118,95 @@ fn parse_line(session_id: &str, sequence: u64, line: &str) -> Result<NormalizedE
         event_type: EventType::from_label(label),
         payload,
     })
+}
+
+fn parse_mtga_json_line(
+    session_id: &str,
+    sequence: u64,
+    line: &str,
+    value: Value,
+) -> Result<NormalizedEvent, ParseError> {
+    let object = value.as_object().ok_or_else(|| ParseError::InvalidLine {
+        sequence,
+        line: line.to_owned(),
+    })?;
+
+    let timestamp = string_field(object, "timestamp")
+        .or_else(|| string_field(object, "timestampUtc"))
+        .ok_or_else(|| ParseError::InvalidLine {
+            sequence,
+            line: line.to_owned(),
+        })?;
+
+    let event_name = string_field(object, "eventName")
+        .or_else(|| string_field(object, "event"))
+        .ok_or_else(|| ParseError::InvalidLine {
+            sequence,
+            line: line.to_owned(),
+        })?;
+
+    let payload_object = object
+        .get("payload")
+        .and_then(Value::as_object)
+        .unwrap_or(object);
+
+    let event_type = match event_name.as_str() {
+        "MatchGameRoomStateChanged" => {
+            let state = string_field(payload_object, "state")
+                .or_else(|| string_field(object, "state"))
+                .unwrap_or_default();
+            if state.contains("Completed") || state.contains("Ended") {
+                EventType::MatchEnd
+            } else {
+                EventType::MatchStart
+            }
+        }
+        "PlayerInventory.GetPlayerCardsV3" => EventType::CollectionSnapshot,
+        "PlayerInventory.GetPlayerInventory" => EventType::InventorySnapshot,
+        "Draft.MakePick" => EventType::DraftPick,
+        other => EventType::Unknown(other.to_owned()),
+    };
+
+    Ok(NormalizedEvent {
+        session_id: session_id.to_owned(),
+        sequence,
+        timestamp,
+        event_type,
+        payload: flatten_simple_fields(payload_object, &["eventName", "event", "timestamp", "timestampUtc"]),
+    })
+}
+
+fn string_field(object: &Map<String, Value>, key: &str) -> Option<String> {
+    object.get(key).and_then(|value| match value {
+        Value::String(text) => Some(text.clone()),
+        Value::Number(number) => Some(number.to_string()),
+        Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
+    })
+}
+
+fn flatten_simple_fields(object: &Map<String, Value>, reserved: &[&str]) -> BTreeMap<String, String> {
+    let mut payload = BTreeMap::new();
+    for (key, value) in object {
+        if reserved.contains(&key.as_str()) {
+            continue;
+        }
+
+        match value {
+            Value::String(text) => {
+                payload.insert(key.clone(), text.clone());
+            }
+            Value::Number(number) => {
+                payload.insert(key.clone(), number.to_string());
+            }
+            Value::Bool(flag) => {
+                payload.insert(key.clone(), flag.to_string());
+            }
+            _ => {}
+        }
+    }
+
+    payload
 }
 
 fn sha256(line: &str) -> String {
