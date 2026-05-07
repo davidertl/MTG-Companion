@@ -1,3 +1,6 @@
+export * from "./app/ArenaAppShell";
+export * from "./app/buildArenaAppShellState";
+export * from "./app/renderArenaAppShell";
 export * from "./lib/decks/cache";
 export * from "./lib/export/index";
 export * from "./lib/network/privacy";
