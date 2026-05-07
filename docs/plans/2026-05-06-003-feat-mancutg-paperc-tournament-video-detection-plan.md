@@ -53,9 +53,9 @@ MancuTG-backend besitzt jetzt bereits eine gemeinsame Event-Huelle fuer MancuTG-
 
 ### Relevant Code and Patterns
 
-- `packages/shared-schema/src/events.ts`: bestehende gemeinsame Event-Huelle mit `eventId`, `sourceApp`, `eventType`, `occurredAt` und `payload`
-- `services/api/src/domain/eventService.ts`: aktueller Dedupe-Ansatz (`sourceApp + eventId`)
-- `services/api/src/routes/events.ts`: bestehende `/events`-Ingestion fuer MancuTG-ArenaC und MancuTG-PaperC
+- `packages/shared-schema/src/events.ts`: bestehender Session-/Event-Batchvertrag mit `sessions[]`, `events[]`, `sourceSessionId`, `provenance`, `confidence` und `reviewStatus`
+- `services/api/src/domain/eventService.ts`: aktueller Dedupe-Ansatz ueber `sourceApp + sourceSessionId + eventId` plus optionalen `idempotencyKey`
+- `services/api/src/routes/events.ts`: bestehende `/events`-Ingestion fuer Session-/Event-Batches von MancuTG-ArenaC und MancuTG-PaperC
 - `services/api/src/server.ts`: startbarer MancuTG-backend-Server mit Health-/Sync-/Archidekt-/Events-Routen
 - `docs/architecture/unified-mtg-companion-architecture.md`: Produktgrenzen fuer MancuTG-backend, MancuTG-ArenaC und MancuTG-PaperC
 - `docs/plans/2026-05-06-001-feat-unified-mtg-companion-platform-plan.md`: Foundations-Plan inkl. gemeinsamer Event-Schnittstelle
@@ -65,7 +65,7 @@ MancuTG-backend besitzt jetzt bereits eine gemeinsame Event-Huelle fuer MancuTG-
 
 - Es gibt weiterhin keine `docs/solutions/`-Artefakte; die Architektur- und Planungsdokumente fungieren derzeit als de-facto Learnings.
 - Die aktuelle Repo-Doku ist konsistent darin, dass Event-Ingestion und Sync zwei getrennte Vertraege bleiben muessen.
-- Die aktuelle `/events`-Ingestion ist bewusst generisch; PaperC muss deshalb ueber explizite Zusatzidentitaeten und Review-/Projektionsschichten wachsen, nicht ueber eine komplett separate Basisschnittstelle.
+- Die aktuelle `/events`-Ingestion besitzt jetzt einen app-uebergreifenden Kernvertrag, bleibt aber fuer PaperC-Turnierlogik noch bewusst generisch. PaperC muss deshalb ueber explizite Zusatzidentitaeten und Review-/Projektionsschichten wachsen, nicht ueber eine komplett separate Basisschnittstelle.
 
 ### External References
 
@@ -76,12 +76,12 @@ MancuTG-backend besitzt jetzt bereits eine gemeinsame Event-Huelle fuer MancuTG-
 
 ## Key Technical Decisions
 
-- **Gleiche Event-Huelle, getrennte Producer-Logik:** MancuTG-PaperC verwendet dieselbe Backend-Event-Huelle wie MancuTG-ArenaC, erhaelt aber eigene PaperC-spezifische Validatoren, Feldkonventionen und Projektionen.
+- **Gleicher Session-/Event-Batchvertrag, getrennte Producer-Logik:** MancuTG-PaperC verwendet denselben Backend-Batchvertrag wie MancuTG-ArenaC, erhaelt aber eigene PaperC-spezifische Validatoren, Feldkonventionen und Projektionen.
 - **Medieningest ist nicht dasselbe wie Eventing:** Rohvideo, Clips, Frames oder Artefakt-Manifeste dürfen nicht direkt ueber `/events` laufen. `/events` bleibt fuer normalisierte Beobachtungen, Korrekturen und Finalisierungen; Medien erhalten einen separaten Upload-/Artefaktpfad.
 - **Append-only fuer Rohbeobachtungen, Projektionen fuer Wahrheit:** Automatische Detektionen, Review-Entscheidungen und manuelle Korrekturen werden als Ereignisse gespeichert; der autoritative Turnierzustand entsteht in Projektionen.
 - **Parallelitaet ueber Partitionsschluessel statt globaler Queue:** Worker und Projektoren werden mindestens nach `tournamentId + roundId + tableId` (oder einem abgeleiteten `matchStreamKey`) partitioniert. Innerhalb eines Streams gilt ordering, zwischen Streams gilt Parallelitaet.
 - **Review ist ein Kernworkflow, kein Ausnahmefall:** Niedrig sichere oder widerspruechliche Vision-Outputs muessen eine eigene Review-Queue speisen, statt in „best effort“-Autozustand zu verschwinden.
-- **MancuTG-PaperC benoetigt explizite Capture-Identitaet:** Die aktuelle Dedupe-Regel `sourceApp + eventId` reicht fuer parallele Videoquellen allein nicht. PaperC braucht zusaetzliche stabile Kontextfelder wie `tournamentId`, `roundId`, `tableId`, `matchId`, `captureSessionId` und `cameraId` innerhalb seines Payload-Vertrags.
+- **MancuTG-PaperC benoetigt explizite Capture-Identitaet:** Die aktuelle Dedupe-Regel `sourceApp + sourceSessionId + eventId` ist robuster, reicht fuer parallele Videoquellen aber allein noch nicht. PaperC braucht zusaetzliche stabile Kontextfelder wie `tournamentId`, `roundId`, `tableId`, `matchId`, `captureSessionId` und `cameraId` innerhalb seines Payload-Vertrags.
 - **Finalisierung und Reopen als eigene Domänenereignisse:** Ein erkannter oder manueller Matchabschluss darf nicht einfach ein boolescher Zustand sein. Finalisierung, Reopen und Korrektur muessen auditable Ereignisse mit Projektion sein.
 
 ---
@@ -90,7 +90,7 @@ MancuTG-backend besitzt jetzt bereits eine gemeinsame Event-Huelle fuer MancuTG-
 
 ### Resolved During Planning
 
-- **Soll MancuTG-PaperC dieselbe Backend-Basisschnittstelle wie MancuTG-ArenaC verwenden?** Ja. Die bestehende `/events`-Huelle bleibt der gemeinsame Basiskanal.
+- **Soll MancuTG-PaperC dieselbe Backend-Basisschnittstelle wie MancuTG-ArenaC verwenden?** Ja. Der bestehende `/events`-Session-/Event-Batchvertrag bleibt der gemeinsame Basiskanal.
 - **Soll Rohvideo ueber dieselbe Schnittstelle wie Events laufen?** Nein. Medien und normalisierte Events werden getrennt transportiert.
 - **Soll Mehrspiel-/Mehrtisch-Verarbeitung zentral oder partitioniert erfolgen?** Partitioniert. Per-Stream-Ordering, Cross-Stream-Parallelitaet.
 
@@ -173,7 +173,7 @@ flowchart LR
 | Partition key | `tournamentId + roundId + tableId` or derived `matchStreamKey` |
 | Within-stream ordering | strict append/projection order |
 | Cross-stream ordering | none required; process independently |
-| Dedupe | base-level `sourceApp + eventId`, plus PaperC contextual identity in payload |
+| Dedupe | base-level `sourceApp + sourceSessionId + eventId`, plus PaperC contextual identity in payload |
 | Late arrivals | append event, mark contradiction or create review task instead of overwriting |
 | Reprocessing | emit superseding review/correction/finalization events, not silent replacement |
 
@@ -197,7 +197,7 @@ flowchart LR
 - Test: `services/api/tests/events-contract.spec.ts`
 
 **Approach:**
-- Die bestehende Event-Huelle beibehalten, aber fuer PaperC einen klaren Payload-Vertrag mit verpflichtenden Kontextfeldern einfuehren: `tournamentId`, `roundId`, `tableId`, `matchId`, `captureSessionId`, `cameraId`, `gameKey`.
+- Den bestehenden Session-/Event-Batchvertrag beibehalten, aber fuer PaperC einen klaren Payload-Vertrag mit verpflichtenden Kontextfeldern einfuehren: `tournamentId`, `roundId`, `tableId`, `matchId`, `captureSessionId`, `cameraId`, `gameKey`.
 - PaperC-spezifische Eventklassen in Gruppen schneiden: Beobachtung, Review, Korrektur, Finalisierung.
 - `sourceApp` bleibt top-level; turnierspezifische Routing-/Dedupe-Informationen leben im PaperC-Payload-Vertrag.
 
@@ -210,7 +210,7 @@ flowchart LR
 - Happy path: Ein MancuTG-ArenaC-Ereignis bleibt unveraendert gueltig.
 - Edge case: Zwei PaperC-Ereignisse mit gleichem `eventId`, aber unterschiedlichem `sourceApp` oder unterschiedlichem Matchstream bleiben unterscheidbar.
 - Error path: Fehlende Pflichtfelder wie `tableId` oder `captureSessionId` werden fuer PaperC-Ereignisse abgelehnt.
-- Integration: Die bestehenden `/events`-Tests bleiben fuer ArenaC gueltig, waehrend PaperC denselben Envelope benutzt.
+- Integration: Die bestehenden `/events`-Tests bleiben fuer ArenaC gueltig, waehrend PaperC denselben Batchvertrag benutzt.
 
 **Verification:**
 - ArenaC und PaperC teilen denselben Basiskanal, aber PaperC besitzt einen ausdruecklichen Turnier-/Capture-Kontextvertrag.
@@ -234,7 +234,7 @@ flowchart LR
 
 **Approach:**
 - Das Backend-Eventmodell um Stream- und Partitionierungsbegriffe erweitern, auch wenn die erste Version noch in-memory bleibt.
-- Basisdedupe (`sourceApp + eventId`) beibehalten, aber zusaetzliche PaperC-Kontextchecks einziehen, um Kollisionen oder fehlende Streamidentitaeten frueh sichtbar zu machen.
+- Basisdedupe (`sourceApp + sourceSessionId + eventId`) beibehalten, aber zusaetzliche PaperC-Kontextchecks einziehen, um Kollisionen oder fehlende Streamidentitaeten frueh sichtbar zu machen.
 - Rueckgaben der `/events`-Route nicht nur als Annahmezaehler, sondern mit Stream-/Source-Zusammenfassung gestalten.
 
 **Execution note:** Start with a failing integration test for cross-stream concurrent ingest before refining the in-memory store semantics.

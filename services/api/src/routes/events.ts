@@ -1,24 +1,35 @@
 import {
-  backendEventEnvelopeSchema,
+  backendEventBatchEnvelopeSchema,
   type BackendEventEnvelope,
+  type BackendEventSession,
 } from "../../../../packages/shared-schema/src/index";
-import { applyBackendEvents, type EventStore } from "../domain/eventService";
+import { applyBackendEventBatch, type EventStore } from "../domain/eventService";
 
 export interface EventsRouteResult {
-  acceptedCount: number;
+  acceptedSessionCount: number;
+  acceptedEventCount: number;
   deduplicatedCount: number;
-  totalStored: number;
+  duplicateBatch: boolean;
+  totalStoredSessions: number;
+  totalStoredEvents: number;
   sourceApps: Array<BackendEventEnvelope["sourceApp"]>;
+  sourceSessionIds: Array<BackendEventSession["sourceSessionId"]>;
 }
 
 export function eventsRoute(input: unknown, store: EventStore): EventsRouteResult {
-  const payload = backendEventEnvelopeSchema.array().parse(input);
-  const result = applyBackendEvents(store, payload);
+  const payload = backendEventBatchEnvelopeSchema.parse(input);
+  const result = applyBackendEventBatch(store, payload);
 
   return {
-    acceptedCount: result.accepted.length,
+    acceptedSessionCount: result.acceptedSessions.length,
+    acceptedEventCount: result.acceptedEvents.length,
     deduplicatedCount: result.deduplicatedCount,
-    totalStored: store.values.length,
-    sourceApps: [...new Set(result.accepted.map((event) => event.sourceApp))],
+    duplicateBatch: result.duplicateBatch,
+    totalStoredSessions: result.totalStoredSessions,
+    totalStoredEvents: result.totalStoredEvents,
+    sourceApps: [...new Set(result.acceptedEvents.map((event) => event.sourceApp))],
+    sourceSessionIds: [
+      ...new Set(result.acceptedEvents.map((event) => event.sourceSessionId)),
+    ],
   };
 }

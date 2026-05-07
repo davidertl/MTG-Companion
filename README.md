@@ -153,17 +153,42 @@ Verfuegbare Endpunkte:
 - `POST /sync`
 - `GET /integrations/archidekt/:deckId`
 
-Gemeinsame Event-Huelle fuer MancuTG-ArenaC und MancuTG-PaperC:
+Gemeinsamer Session-/Event-Batchvertrag fuer MancuTG-ArenaC, MancuTG-PaperC und backendseitige Prozesse:
 
 ```json
 {
-  "eventId": "unique-per-producer",
-  "sourceApp": "mancutg-arenac",
-  "eventType": "arena.match.completed",
-  "occurredAt": "2026-05-06T22:40:00Z",
-  "payload": {
-    "matchId": "match-1"
-  }
+  "idempotencyKey": "push-001",
+  "sessions": [
+    {
+      "sourceSessionId": "arena-session-1",
+      "sourceApp": "mancutg-arenac",
+      "sourceKind": "arena-log",
+      "platform": "windows",
+      "gameMode": "arena",
+      "startedAt": "2026-05-06T22:39:00Z"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "unique-per-session",
+      "sourceApp": "mancutg-arenac",
+      "sourceSessionId": "arena-session-1",
+      "eventType": "arena.match.completed",
+      "occurredAt": "2026-05-06T22:40:00Z",
+      "matchId": "match-1",
+      "provenance": [
+        {
+          "sourceKind": "arena-log",
+          "sourceSessionId": "arena-session-1"
+        }
+      ],
+      "confidence": 1,
+      "reviewStatus": "none",
+      "payload": {
+        "result": "win"
+      }
+    }
+  ]
 }
 ```
 
@@ -176,7 +201,7 @@ Gemeinsame Event-Huelle fuer MancuTG-ArenaC und MancuTG-PaperC:
 - iOS/iPadOS-Offline-Import mit Deduplizierung und `ios`-Tagging
 - TypeScript-Desktop-State fuer Setup, History, Collection, Draft, Privacy und Import-Center in MancuTG-ArenaC
 - startbarer MancuTG-backend-Server fuer Health, gemeinsame Event-Ingestion, Sync und Archidekt-Import
-- gemeinsame Backend-Event-Schnittstelle fuer MancuTG-ArenaC und MancuTG-PaperC
+- gemeinsame Session-/Event-Schnittstelle fuer MancuTG-ArenaC, MancuTG-PaperC und backendseitige Prozesse
 - read-only Archidekt-Connector in Python
 - MancuTG-PaperC ist als eigenstaendiger Produktname reserviert, aber noch nicht implementiert
 

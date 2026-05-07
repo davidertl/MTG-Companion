@@ -31,9 +31,27 @@ Outbound traffic is intentionally small and purpose-gated.
 MancuTG-backend is additive only. It may receive:
 
 - sync objects produced from local entities
-- shared backend event envelopes produced by MancuTG-ArenaC or MancuTG-PaperC
+- shared backend event batches produced by MancuTG-ArenaC, MancuTG-PaperC, or MancuTG-backend
 - validated Archidekt import payloads
 - opt-in telemetry events
+
+Current shared event ingest structure:
+
+- optional `idempotencyKey`
+- `sessions[]`
+- `events[]`
+
+Shared event/session core fields currently modeled:
+
+- `sourceSessionId`
+- `sourceApp` (`mancutg-arenac`, `mancutg-paperc`, or `mancutg-backend`)
+- `sourceKind`
+- `eventId`
+- `eventType`
+- `occurredAt`
+- `provenance[]`
+- `confidence`
+- `reviewStatus`
 
 ### Unified event envelope
 

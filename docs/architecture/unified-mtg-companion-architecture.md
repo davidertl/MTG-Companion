@@ -249,31 +249,66 @@ Wichtig ist, dass **lokale Daten autoritativ fuer MancuTG-ArenaC bleiben**. Manc
 
 ## Einheitliche Backend-Event-Schnittstelle
 
-MancuTG-backend soll Event-Erfassung nicht nur fuer MancuTG-ArenaC, sondern auch fuer MancuTG-PaperC ueber dieselbe Schnittstelle aufnehmen koennen. Dafuer gilt ein gemeinsamer Event-Umschlag:
+MancuTG-backend soll Event-Erfassung nicht nur fuer MancuTG-ArenaC, sondern auch fuer MancuTG-PaperC und backendseitige Review-/Projektionsprozesse ueber dieselbe Schnittstelle aufnehmen koennen. Die konkrete Zielstruktur ist deshalb **kein flaches Eventarray**, sondern ein Batch-Umschlag mit `sessions[]` und `events[]`.
 
 ```json
 {
-  "eventId": "globally-or-producer-unique-id",
-  "sourceApp": "mancutg-arenac | mancutg-paperc",
-  "eventType": "domain.event.name",
-  "occurredAt": "2026-05-06T22:00:00Z",
-  "payload": {
-    "arbitrary": "source-specific structured data"
-  }
+  "idempotencyKey": "batch_01JTZ...",
+  "sessions": [
+    {
+      "sourceSessionId": "ses_arenac_01",
+      "sourceApp": "mancutg-arenac",
+      "sourceKind": "arena-log",
+      "platform": "windows",
+      "gameFamily": "mtg",
+      "gameMode": "arena",
+      "startedAt": "2026-05-06T22:00:00Z"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "evt_01",
+      "sourceApp": "mancutg-arenac",
+      "sourceSessionId": "ses_arenac_01",
+      "eventType": "arena.match.completed",
+      "occurredAt": "2026-05-06T22:05:00Z",
+      "matchId": "match_01",
+      "gameId": "game_01",
+      "streamId": "arena-stream-01",
+      "actor": { "playerRef": "p1" },
+      "provenance": [
+        {
+          "sourceKind": "arena-log",
+          "sourceSessionId": "ses_arenac_01",
+          "parserVersion": "arena-core/1.0.0"
+        }
+      ],
+      "confidence": 1.0,
+      "reviewStatus": "none",
+      "supersedesEventId": null,
+      "payload": {
+        "result": "win"
+      }
+    }
+  ]
 }
 ```
 
-### Ziele dieser Event-Huelle
+### Ziele dieser Zielstruktur
 
-- **gleiche Aufnahmeschnittstelle** fuer Arena- und Papierkarten-Produzenten
+- **gleiche Aufnahmeschnittstelle** fuer Arena-, Papier- und backendseitige Produzenten
 - **eindeutige Producer-Herkunft** ueber `sourceApp`
-- **Deduplizierung** ueber `sourceApp + eventId`
+- **sessionbewusste Identitaet** ueber `sourceSessionId`
+- **Deduplizierung** ueber `sourceApp + sourceSessionId + eventId`
+- **gemeinsame Kernfelder** fuer Match-/Game-Kontext, Provenienz, Confidence und Reviewstatus
 - **produktuebergreifende Erweiterbarkeit**, ohne pro App eine neue Backend-Route erfinden zu muessen
 
 ### Konsequenz fuer die Systemgrenzen
 
-- MancuTG-ArenaC darf Spiel-/Import-/Analyse-Ereignisse in dieser Huelle an MancuTG-backend senden.
-- MancuTG-PaperC darf spaeter Video-/Turnier-/Rundenereignisse in exakt derselben Huelle senden.
+- MancuTG-ArenaC darf Spiel-/Import-/Analyse-Ereignisse in dieser Struktur an MancuTG-backend senden.
+- MancuTG-PaperC darf spaeter Video-/Turnier-/Rundenereignisse in exakt derselben Struktur senden.
+- MancuTG-backend darf selbst Review-, Korrektur- und Finalisierungsereignisse als `sourceApp = "mancutg-backend"` emittieren.
+- `payload` bleibt fuer app-spezifische Erweiterungen erhalten, ist aber nicht mehr der alleinige semantische Vertrag.
 - Sync-Objekte bleiben ein eigener Vertrag fuer Zustandsreplikation; Event-Ingestion ist eine parallele, produktuebergreifende Schnittstelle.
 
 ---

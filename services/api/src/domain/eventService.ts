@@ -1,64 +1,109 @@
 import {
-  backendEventEnvelopeSchema,
+  backendEventBatchEnvelopeSchema,
+  type BackendEventBatchEnvelope,
   type BackendEventEnvelope,
+  type BackendEventSession,
 } from "../../../../packages/shared-schema/src/index";
 
 export interface EventStore {
-  values: BackendEventEnvelope[];
+  sessions: BackendEventSession[];
+  events: BackendEventEnvelope[];
+  seenBatchKeys: string[];
 }
 
 export interface EventApplyResult {
-  accepted: BackendEventEnvelope[];
+  acceptedSessions: BackendEventSession[];
+  acceptedEvents: BackendEventEnvelope[];
   deduplicatedCount: number;
-  totalStored: number;
+  duplicateBatch: boolean;
+  totalStoredSessions: number;
+  totalStoredEvents: number;
 }
 
 export function createInMemoryEventStore(): EventStore {
-  return { values: [] };
+  return {
+    sessions: [],
+    events: [],
+    seenBatchKeys: [],
+  };
 }
 
-export function mergeBackendEvents(
-  existing: BackendEventEnvelope[],
-  updates: BackendEventEnvelope[],
+export function applyBackendEventBatch(
+  store: EventStore,
+  input: unknown,
 ): EventApplyResult {
-  const merged = new Map(
-    existing.map((item) => [`${item.sourceApp}:${item.eventId}`, item]),
-  );
-  let deduplicatedCount = 0;
+  const batch = backendEventBatchEnvelopeSchema.parse(input);
 
-  for (const update of updates) {
-    const key = `${update.sourceApp}:${update.eventId}`;
-    if (merged.has(key)) {
-      deduplicatedCount += 1;
-    }
-    merged.set(key, update);
+  if (batch.idempotencyKey && store.seenBatchKeys.includes(batch.idempotencyKey)) {
+    return {
+      acceptedSessions: [],
+      acceptedEvents: [],
+      deduplicatedCount: batch.events.length,
+      duplicateBatch: true,
+      totalStoredSessions: store.sessions.length,
+      totalStoredEvents: store.events.length,
+    };
   }
 
-  const values = [...merged.values()];
+  const sessionMap = new Map(
+    store.sessions.map((session) => [sessionKey(session.sourceApp, session.sourceSessionId), session]),
+  );
+  const acceptedSessions: BackendEventSession[] = [];
+  for (const session of batch.sessions) {
+    const key = sessionKey(session.sourceApp, session.sourceSessionId);
+    if (!sessionMap.has(key)) {
+      acceptedSessions.push(session);
+    }
+    sessionMap.set(key, session);
+  }
+
+  const eventMap = new Map(
+    store.events.map((event) => [eventKey(event), event]),
+  );
+  let deduplicatedCount = 0;
+  const acceptedEvents: BackendEventEnvelope[] = [];
+
+  for (const event of batch.events) {
+    const sessionIdentity = sessionKey(event.sourceApp, event.sourceSessionId);
+    if (!sessionMap.has(sessionIdentity)) {
+      throw new Error(
+        `unknown session ${event.sourceSessionId} for source app ${event.sourceApp}`,
+      );
+    }
+
+    const key = eventKey(event);
+    if (eventMap.has(key)) {
+      deduplicatedCount += 1;
+      continue;
+    }
+
+    acceptedEvents.push(event);
+    eventMap.set(key, event);
+  }
+
+  store.sessions = [...sessionMap.values()];
+  store.events = [...eventMap.values()];
+
+  if (batch.idempotencyKey) {
+    store.seenBatchKeys = [...store.seenBatchKeys, batch.idempotencyKey];
+  }
+
   return {
-    accepted: updates,
+    acceptedSessions,
+    acceptedEvents,
     deduplicatedCount,
-    totalStored: values.length,
+    duplicateBatch: false,
+    totalStoredSessions: store.sessions.length,
+    totalStoredEvents: store.events.length,
   };
 }
 
-export function applyBackendEvents(
-  store: EventStore,
-  input: unknown[],
-): EventApplyResult {
-  const accepted = input.map((candidate) =>
-    backendEventEnvelopeSchema.parse(candidate),
-  );
-  const result = mergeBackendEvents(store.values, accepted);
-  store.values = [...new Map(
-    [...store.values, ...accepted].map((item) => [
-      `${item.sourceApp}:${item.eventId}`,
-      item,
-    ]),
-  ).values()];
-  return {
-    accepted: result.accepted,
-    deduplicatedCount: result.deduplicatedCount,
-    totalStored: store.values.length,
-  };
+function sessionKey(sourceApp: string, sourceSessionId: string): string {
+  return `${sourceApp}:${sourceSessionId}`;
 }
+
+function eventKey(event: BackendEventEnvelope): string {
+  return `${event.sourceApp}:${event.sourceSessionId}:${event.eventId}`;
+}
+
+export type { BackendEventBatchEnvelope };
