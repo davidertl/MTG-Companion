@@ -7,7 +7,12 @@
     "version": "0.1.0",
     "minimum-overwolf-version": "0.169.0",
     "description": "Offline-first MTG Arena log companion (windowed MVP).",
-    "dock_button_title": "ArenaC"
+    "dock_button_title": "ArenaC",
+    "icon": "assets/IconMouseOver.png",
+    "icon_gray": "assets/IconMouseNormal.png",
+    "launcher_icon": "assets/launcher_icon.ico",
+    "window_icon": "assets/window_icon.png",
+    "splash_image": "assets/splash.png"
   },
   "permissions": ["GameInfo", "FileSystem"],
   "data": {
@@ -18,6 +23,12 @@
     "game_events": [21566],
     "launch_events": {
       "game_launch": [21566]
+    },
+    "extra-objects": {
+      "processManager": {
+        "file": "plugins/ProcessManager.dll",
+        "class": "TODO.REPLACE_WITH_PROCESS_MANAGER_PLUGIN_CLASS"
+      }
     },
     "start_window": "setup",
     "windows": {

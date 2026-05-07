@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 
-import { ArenaClientApp } from "@arenac/client/ArenaClientApp";
-import { DEFAULT_ARENAC_API_BASE } from "@arenac/lib/api/client";
+import { ArenaClientApp } from "../../desktop/src/client/ArenaClientApp";
+import { DEFAULT_ARENAC_API_BASE } from "../../desktop/src/lib/api/client";
 
 const root = document.getElementById("root");
 if (!root) {

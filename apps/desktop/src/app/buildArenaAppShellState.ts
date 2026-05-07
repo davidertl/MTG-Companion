@@ -1,16 +1,13 @@
-import {
-  buildCollectionRouteState,
-  buildDecksRouteState,
-  buildDiagnosticsRouteState,
-  buildDraftRouteState,
-  buildHistoryRouteState,
-  buildImportCenterState,
-  buildInventoryRouteState,
-  buildPrivacyRouteState,
-  buildSettingsState,
-  getSetupBanner,
-  getSetupChecklist,
-} from "../index";
+import { buildCollectionRouteState } from "../routes/collection/index";
+import { buildDecksRouteState } from "../routes/decks/index";
+import { buildDiagnosticsRouteState } from "../routes/diagnostics/index";
+import { buildDraftRouteState } from "../routes/draft/index";
+import { buildHistoryRouteState } from "../lib/query/history";
+import { buildImportCenterState } from "../routes/imports/index";
+import { buildInventoryRouteState } from "../routes/inventory/index";
+import { buildPrivacyRouteState } from "../routes/privacy/index";
+import { buildSettingsState } from "../routes/settings/index";
+import { getSetupBanner, getSetupChecklist } from "../routes/setup/index";
 import type { DeckSnapshot, PrivacySettings } from "../../../../packages/shared-schema/src/index";
 import { createPrivacySettings } from "../lib/network/privacy";
 import type { ImportCenterSummary } from "../routes/imports/index";

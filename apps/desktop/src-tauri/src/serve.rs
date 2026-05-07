@@ -15,6 +15,7 @@ use axum::{Json, Router};
 use core_domain::ImportSourceKind;
 use core_store::EventStore;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
@@ -51,6 +52,7 @@ struct ServiceInner {
     store_path: PathBuf,
     settings_path: PathBuf,
     store: Option<EventStore>,
+    producer_config: ProducerConfig,
 }
 
 impl ServiceInner {
@@ -63,6 +65,7 @@ impl ServiceInner {
             store_path,
             settings_path,
             store: None,
+            producer_config: ProducerConfig::default(),
         }
     }
 
@@ -114,20 +117,46 @@ impl ServiceInner {
 pub fn default_player_log_path() -> Option<String> {
     #[cfg(windows)]
     {
-        std::env::var("USERPROFILE").ok().map(|profile| {
-            PathBuf::from(profile)
-                .join("AppData")
-                .join("LocalLow")
-                .join("Wizards Of The Coast")
-                .join("MTG Arena")
-                .join("Player.log")
-                .to_string_lossy()
-                .into_owned()
-        })
+        std::env::var("USERPROFILE")
+            .ok()
+            .map(|profile| windows_player_log_path(Path::new(&profile)).to_string_lossy().into_owned())
     }
     #[cfg(not(windows))]
     {
         None
+    }
+}
+
+fn windows_player_log_path(user_profile: &Path) -> PathBuf {
+    user_profile
+        .join("AppData")
+        .join("LocalLow")
+        .join("Wizards Of The Coast")
+        .join("MTGA")
+        .join("Player.log")
+}
+
+pub fn candidate_player_log_paths() -> Vec<PathBuf> {
+    #[cfg(windows)]
+    {
+        let Some(user_profile) = std::env::var_os("USERPROFILE") else {
+            return Vec::new();
+        };
+        let base = PathBuf::from(user_profile)
+            .join("AppData")
+            .join("LocalLow")
+            .join("Wizards Of The Coast");
+        vec![
+            base.join("MTGA").join("Player.log"),
+            base.join("MTGA").join("player.log"),
+            base.join("MTGA").join("player-prev.log"),
+            base.join("MTG Arena").join("Player.log"),
+            base.join("MTG Arena").join("player.log"),
+        ]
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
     }
 }
 
@@ -203,39 +232,17 @@ pub async fn run_serve(args: &[String]) -> Result<(), String> {
         inner: Arc::new(Mutex::new(ServiceInner::new(data_dir.clone()))),
     };
 
-    let (listener, port) = match fixed_port {
-        Some(port) => {
-            let addr: SocketAddr = format!("127.0.0.1:{port}")
-                .parse()
-                .map_err(|_| "invalid listen address".to_owned())?;
-            let listener = TcpListener::bind(addr).await.map_err(|error| {
-                format!("failed to bind {addr}: {error}")
-            })?;
-            (listener, port)
+    let port = fixed_port.unwrap_or(DEFAULT_LOOPBACK_PORT);
+    let addr: SocketAddr = format!("127.0.0.1:{port}")
+        .parse()
+        .map_err(|_| "invalid listen address".to_owned())?;
+    let listener = TcpListener::bind(addr).await.map_err(|error| {
+        if error.kind() == std::io::ErrorKind::AddrInUse {
+            format!("port {port} already in use")
+        } else {
+            format!("failed to bind {addr}: {error}")
         }
-        None => {
-            let preferred: SocketAddr = format!("127.0.0.1:{DEFAULT_LOOPBACK_PORT}")
-                .parse()
-                .map_err(|_| "invalid default listen address".to_owned())?;
-            match TcpListener::bind(preferred).await {
-                Ok(listener) => (listener, DEFAULT_LOOPBACK_PORT),
-                Err(error) => {
-                    eprintln!(
-                        "warn: port {DEFAULT_LOOPBACK_PORT} busy ({error}), binding ephemeral port"
-                    );
-                    let fallback: SocketAddr = "127.0.0.1:0".parse().unwrap();
-                    let listener = TcpListener::bind(fallback).await.map_err(|e| {
-                        format!("failed to bind ephemeral loopback port: {e}")
-                    })?;
-                    let port = listener
-                        .local_addr()
-                        .map_err(|e| format!("failed to read local address: {e}"))?
-                        .port();
-                    (listener, port)
-                }
-            }
-        }
-    };
+    })?;
 
     let handshake_path = write_handshake(&data_dir, port)?;
     eprintln!(
@@ -263,6 +270,9 @@ fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/v1/detect-player-log", get(detect_player_log))
+        .route("/v1/producer/config", get(producer_config_get))
+        .route("/v1/producer/config", post(producer_config_set))
+        .route("/v1/producer/emit-batch", post(emit_ingest_batch))
         .route("/v1/status", get(status))
         .route("/v1/configure", post(configure))
         .route("/v1/bootstrap", post(bootstrap_handler))
@@ -286,9 +296,201 @@ async fn health() -> impl IntoResponse {
 }
 
 async fn detect_player_log() -> Json<serde_json::Value> {
+    let detected = candidate_player_log_paths()
+        .into_iter()
+        .find(|candidate| candidate.exists())
+        .map(|path| path.to_string_lossy().into_owned())
+        .or_else(default_player_log_path);
     Json(serde_json::json!({
-        "playerLogPath": default_player_log_path()
+        "playerLogPath": detected
     }))
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProducerConfig {
+    backend_url: String,
+    producer_token: Option<String>,
+    upload_raw_logs: bool,
+    upload_normalized_events: bool,
+}
+
+impl Default for ProducerConfig {
+    fn default() -> Self {
+        Self {
+            backend_url: "http://127.0.0.1:18080".to_owned(),
+            producer_token: None,
+            upload_raw_logs: false,
+            upload_normalized_events: true,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IngestProducer {
+    app: String,
+    version: String,
+    instance_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IngestGame {
+    game_key: String,
+    game_family: String,
+    title: String,
+    mode: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IngestSession {
+    source_session_id: String,
+    started_at: String,
+    source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ended_at: Option<String>,
+    #[serde(default)]
+    metadata: std::collections::HashMap<String, Value>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IngestProvenance {
+    source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line_number: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    frame_no: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    frame_time_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parser_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    artifact_id: Option<String>,
+    #[serde(default)]
+    metadata: std::collections::HashMap<String, Value>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IngestEvent {
+    event_id: String,
+    source_event_id: String,
+    event_type: String,
+    occurred_at: String,
+    seq: u64,
+    #[serde(default)]
+    targets: Vec<Value>,
+    #[serde(default)]
+    payload: std::collections::HashMap<String, Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    confidence: Option<f64>,
+    provenance: IngestProvenance,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IngestBatchRequest {
+    idempotency_key: String,
+    producer: IngestProducer,
+    game: IngestGame,
+    session: IngestSession,
+    events: Vec<IngestEvent>,
+}
+
+fn build_sample_ingest_batch() -> IngestBatchRequest {
+    IngestBatchRequest {
+        idempotency_key: "arenac-local-2026-05-07-session-abc-batch-00042".to_owned(),
+        producer: IngestProducer {
+            app: "mancutg-arenac".to_owned(),
+            version: "0.1.0".to_owned(),
+            instance_id: "local-windows-device".to_owned(),
+            display_name: Some("ArenaC Local Windows".to_owned()),
+        },
+        game: IngestGame {
+            game_key: "mtg-arena".to_owned(),
+            game_family: "mtg".to_owned(),
+            title: "Magic: The Gathering Arena".to_owned(),
+            mode: "arena".to_owned(),
+        },
+        session: IngestSession {
+            source_session_id: "arena-log-session-abc".to_owned(),
+            started_at: "2026-05-07T18:00:00.000Z".to_owned(),
+            source: "player-log".to_owned(),
+            ended_at: None,
+            metadata: std::collections::HashMap::new(),
+        },
+        events: vec![IngestEvent {
+            event_id: "arena-log-session-abc-000001".to_owned(),
+            source_event_id: "arena-log-session-abc-000001".to_owned(),
+            event_type: "mtg.arena.log.line.parsed".to_owned(),
+            occurred_at: "2026-05-07T18:00:01.000Z".to_owned(),
+            seq: 1,
+            targets: vec![],
+            payload: std::collections::HashMap::from([
+                ("rawKind".to_owned(), Value::String("match_state".to_owned())),
+                ("parsed".to_owned(), Value::Object(Default::default())),
+            ]),
+            confidence: Some(1.0),
+            provenance: IngestProvenance {
+                source: "player.log".to_owned(),
+                line_number: Some(1234),
+                frame_no: None,
+                frame_time_ms: None,
+                parser_version: None,
+                model_version: None,
+                artifact_id: None,
+                metadata: std::collections::HashMap::new(),
+            },
+        }],
+    }
+}
+
+async fn producer_config_get(State(state): State<AppState>) -> Result<Json<ProducerConfig>, ApiError> {
+    let inner = state.inner.lock().map_err(|_| ApiError::internal("lock poisoned"))?;
+    Ok(Json(inner.producer_config.clone()))
+}
+
+async fn producer_config_set(
+    State(state): State<AppState>,
+    Json(body): Json<ProducerConfig>,
+) -> Result<Json<ProducerConfig>, ApiError> {
+    let mut inner = state.inner.lock().map_err(|_| ApiError::internal("lock poisoned"))?;
+    inner.producer_config = body.clone();
+    Ok(Json(body))
+}
+
+async fn emit_ingest_batch(State(state): State<AppState>) -> Result<Json<IngestBatchRequest>, ApiError> {
+    let config = {
+        let inner = state.inner.lock().map_err(|_| ApiError::internal("lock poisoned"))?;
+        inner.producer_config.clone()
+    };
+    let batch = build_sample_ingest_batch();
+    if config.upload_normalized_events {
+        let endpoint = format!("{}/v1/ingest/batches", config.backend_url.trim_end_matches('/'));
+        let client = reqwest::Client::new();
+        let mut request = client.post(endpoint).json(&batch);
+        if let Some(token) = config.producer_token {
+            request = request.bearer_auth(token);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|error| ApiError::internal(format!("failed to emit ingest batch: {error}")))?;
+        if !response.status().is_success() {
+            return Err(ApiError::internal(format!(
+                "failed to emit ingest batch: {}",
+                response.status()
+            )));
+        }
+    }
+    Ok(Json(batch))
 }
 
 #[derive(Debug, Serialize)]
@@ -621,6 +823,7 @@ impl IntoResponse for ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use std::time::Duration;
 
     #[tokio::test]
@@ -693,5 +896,52 @@ mod tests {
         assert!(r.status().is_success(), "{:?}", r.text().await);
         server.abort();
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn default_player_log_path_uses_mtga_folder() {
+        let path = windows_player_log_path(Path::new(r"C:\Users\TestUser"));
+        assert!(path.ends_with(Path::new(r"Wizards Of The Coast\MTGA\Player.log")));
+    }
+
+    #[test]
+    fn candidate_player_log_paths_include_expected_entries() {
+        let base = PathBuf::from(r"C:\Users\TestUser")
+            .join("AppData")
+            .join("LocalLow")
+            .join("Wizards Of The Coast");
+        let paths = vec![
+            base.join("MTGA").join("Player.log"),
+            base.join("MTGA").join("player.log"),
+            base.join("MTGA").join("player-prev.log"),
+            base.join("MTG Arena").join("Player.log"),
+            base.join("MTG Arena").join("player.log"),
+        ];
+        assert_eq!(paths.len(), 5);
+        assert!(paths[0].ends_with(Path::new(r"Wizards Of The Coast\MTGA\Player.log")));
+        assert!(paths[4].ends_with(Path::new(r"Wizards Of The Coast\MTG Arena\player.log")));
+    }
+
+    #[tokio::test]
+    async fn fixed_port_returns_addr_in_use_error() {
+        let listener = TcpListener::bind("127.0.0.1:17890").await.expect("reserve port");
+        let err = run_serve(&[]).await.expect_err("should fail when port is occupied");
+        assert!(err.contains("port 17890 already in use"));
+        drop(listener);
+    }
+
+    #[test]
+    fn sample_ingest_batch_serializes_contract_shape() {
+        let batch = build_sample_ingest_batch();
+        let json = serde_json::to_value(batch).expect("serialize");
+        assert!(json.get("idempotencyKey").is_some());
+        assert!(json.get("producer").is_some());
+        assert!(json.get("game").is_some());
+        assert!(json.get("session").is_some());
+        assert!(json
+            .get("events")
+            .and_then(|events| events.as_array())
+            .map(|events| !events.is_empty())
+            .unwrap_or(false));
     }
 }

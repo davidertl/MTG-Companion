@@ -19,5 +19,18 @@
     "services/**/*.ts",
     "services/**/*.py"
   ],
-  "exclude": ["node_modules", "target"]
+  "exclude": [
+    "node_modules",
+    "target",
+    "apps/overwolf/node_modules",
+    "apps/overwolf/dist",
+    "apps/overwolf/**/*.ts",
+    "apps/overwolf/**/*.tsx",
+    "apps/paperc-desktop/**/*",
+    "apps/paperc-desktop/node_modules",
+    "apps/paperc-desktop/dist",
+    "services/web/**/*",
+    "services/web/node_modules",
+    "services/web/dist"
+  ]
 }
