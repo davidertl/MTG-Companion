@@ -47,4 +47,3 @@ flowchart LR
 ## Source references
 
 - Detailed architecture narrative: `docs/architecture/unified-mtg-companion-architecture.md`
-- Shell decision: `docs/plans/2026-05-07-003-decision-arenac-overwolf-windows-shell.md`

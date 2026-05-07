@@ -27,7 +27,7 @@ Define one stable project-level source of truth that all sub-plans inherit.
 
 ## Current strategic decisions
 
-- Windows MVP shell for ArenaC is Overwolf (`2026-05-07-003`).
+- Windows MVP shell for ArenaC is Overwolf.
 - ArenaC product completion is prioritized before deep PaperC runtime expansion.
 - Backend early scope remains constrained to shared contracts + ArenaC MVP needs.
 

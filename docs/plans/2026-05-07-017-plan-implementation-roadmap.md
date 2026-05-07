@@ -64,6 +64,3 @@ flowchart LR
 ## Governance
 
 - This file is the only active roadmap reference.
-- Historical roadmaps remain preserved for context:
-  - `2026-05-07-002-feat-open-implementation-roadmap-plan.md`
-  - `2026-05-06-002-feat-foundation-functionalization-plan.md`

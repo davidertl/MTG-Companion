@@ -1,12 +1,12 @@
 ---
-title: plans index: canonical and legacy
+title: plans index: canonical
 status: active
 updated: 2026-05-07
 ---
 
 # Plans index (canonical)
 
-This folder contains both **canonical current plans** and **legacy historical plans**.
+This folder contains the **canonical current plans**.
 
 ## Canonical plans (use these first)
 
@@ -28,20 +28,11 @@ This folder contains both **canonical current plans** and **legacy historical pl
 - Backend capabilities, persistence, and service boundaries: `016`
 - Phase ordering and milestones: `017`
 
-## Legacy plans (kept for history, not removed)
-
-- `2026-05-06-001-feat-unified-mtg-companion-platform-plan.md` (foundation baseline)
-- `2026-05-06-002-feat-foundation-functionalization-plan.md` (foundation-to-functional bridge)
-- `2026-05-06-003-feat-mancutg-paperc-tournament-video-detection-plan.md` (detailed historical PaperC analysis)
-- `2026-05-07-001-feat-app-spanning-event-model-plan.md` (completed event model implementation)
-- `2026-05-07-002-feat-open-implementation-roadmap-plan.md` (older consolidated roadmap snapshot)
-- `2026-05-07-003-decision-arenac-overwolf-windows-shell.md` (active architecture decision)
-
 ## Alignment note
 
 Canonical plans are aligned with the latest direction:
 
-- Windows-first ArenaC shell is Overwolf for MVP (`2026-05-07-003`)
+- Windows-first ArenaC shell is Overwolf for MVP
 - ArenaC before PaperC deep runtime work
 - Shared app-spanning event contract remains the API foundation
 - Offline-first remains non-negotiable

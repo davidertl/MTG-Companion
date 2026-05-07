@@ -60,5 +60,5 @@ Define a stable naming and payload protocol for app-to-backend event communicati
 
 ## References
 
-- Event model implementation history: `docs/plans/2026-05-07-001-feat-app-spanning-event-model-plan.md`
+- Shared contract implementation: `packages/shared-schema/src/events.ts`
 - Backend ingest implementation: `services/api/src/domain/eventService.ts`
