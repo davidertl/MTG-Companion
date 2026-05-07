@@ -1,6 +1,6 @@
 # Zielarchitektur: MancuTG-Companion
 
-_Stand: 2026-05-06_
+_Stand: 2026-05-07_
 
 ## Produktterminologie
 
@@ -159,15 +159,16 @@ flowchart LR
 Empfohlener Stack:
 
 - **Rust** fuer Parser, Dateibeobachtung, Domainkern und lokale Persistenz
-- **Tauri** als Desktop-Shell
-- **TypeScript/React** fuer UI und Overlay-nahe Darstellung
+- **Overwolf** als primaere Windows-Shell fuer das MVP (installierbare App, Fenster-UI ohne Ingame-Overlay in der ersten Auslieferung)
+- **TypeScript/React** fuer die Praesentationsschicht; Anbindung an den Kern ueber einen **lokalen HTTP-Dienst** (`mancutg-arenac serve`, Loopback-only)
 - **SQLite** als lokaler Store
+- **Tauri** bleibt als spaetere alternative Desktop-Shell denkbar; die Overlay-Schicht bleibt hinter einer klaren Boundary, damit Shell-Wechsel moeglich bleiben.
 
 Begruendung:
 
 - Rust bietet robuste Distribution und gute Performance fuer Dauerbeobachtung und Log Parsing.
-- Tauri reduziert die Desktop-Runtime-Kosten gegenueber Electron, ohne den Web-UI-Ansatz aufzugeben.
-- Die Overlay-Schicht sollte aber hinter einer separaten Boundary liegen, damit bei platform-spezifischer Reibung ein Shell-Wechsel oder ein natives Overlay-Modul moeglich bleibt.
+- Overwolf deckt Windows-First-Verteilung und einfache Installation fuer MTG-Arena-Nutzer ab, ohne den Kern von der UI-Laufzeit zu koppeln.
+- Die Overlay-Schicht sollte weiterhin hinter einer separaten Boundary liegen, damit bei platform-spezifischer Reibung ein Shell-Wechsel oder ein natives Overlay-Modul moeglich bleibt.
 
 ### MancuTG-backend
 

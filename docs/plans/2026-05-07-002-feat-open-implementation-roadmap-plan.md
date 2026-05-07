@@ -1,11 +1,15 @@
 ---
 title: feat: Roadmap the remaining MancuTG-Companion implementation work
 type: feat
-status: active
+status: superseded
 date: 2026-05-07
 ---
 
 # feat: Roadmap the remaining MancuTG-Companion implementation work
+
+> Superseded as canonical roadmap by:
+> - `docs/plans/2026-05-07-017-plan-implementation-roadmap.md`
+> - `docs/plans/README.md` (canonical plan index)
 
 ## Summary
 

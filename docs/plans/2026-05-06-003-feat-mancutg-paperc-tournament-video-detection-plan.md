@@ -1,11 +1,15 @@
 ---
 title: feat: Plan MancuTG-PaperC tournament video detection
 type: feat
-status: active
+status: superseded
 date: 2026-05-06
 ---
 
 # feat: Plan MancuTG-PaperC tournament video detection
+
+> Superseded as canonical PaperC plan by:
+> - `docs/plans/2026-05-07-014-plan-paperc.md`
+> - `docs/plans/2026-05-07-017-plan-implementation-roadmap.md`
 
 ## Summary
 

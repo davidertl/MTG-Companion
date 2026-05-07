@@ -33,15 +33,18 @@ Dieses Repository definiert die Zielarchitektur fuer eine neue App, die diese Fa
 ## Dokumente
 
 - `docs/architecture/unified-mtg-companion-architecture.md` - Produkt- und Zielarchitektur
+- `docs/plans/README.md` - kanonischer Plan-Index (Project, Architecture, ArenaC, PaperC, API-Protocol, Backend, Roadmap)
 - `docs/plans/2026-05-06-001-feat-unified-mtg-companion-platform-plan.md` - technische Umsetzungsplanung
 - `docs/privacy/data-flow.md` - dokumentierter Datenfluss fuer Offline-, Sync- und Telemetriepfade
 - `docs/release/README.md` - Release-Hinweise fuer den aktuellen ArenaC-MVP-Stand
 - `docs/release/mancutg-arenac-mvp-checklist.md` - konkrete Release-Checkliste fuer MancuTG-ArenaC
+- `docs/release/overwolf-install.md` - Installation der Windows-Overwolf-Variante von MancuTG-ArenaC
+- `docs/plans/2026-05-07-003-decision-arenac-overwolf-windows-shell.md` - Entscheidung: Overwolf als Windows-MVP-Shell
 - `LICENSE` - Apache License 2.0
 
 ## Architektur in einem Satz
 
-MancuTG-ArenaC ist ein lokaler Desktop-Client mit eigenem Event-Store; MancuTG-backend uebernimmt optional Sync, konto-basierte Mehrgeraete-Funktionen, aggregierte Analytics und Integrationen wie Archidekt, ohne den Kernnutzen des Clients davon abhaengig zu machen.
+MancuTG-ArenaC ist ein lokaler Client mit eigenem Event-Store; auf **Windows** ist die MVP-Praesentationsschicht eine **Overwolf-App** (`apps/overwolf/`), die den Rust-Kern ueber einen **lokalen Dienst** (`mancutg-arenac serve`, nur Loopback) ansteuert. MancuTG-backend uebernimmt optional Sync, konto-basierte Mehrgeraete-Funktionen, aggregierte Analytics und Integrationen wie Archidekt, ohne den Kernnutzen des Clients davon abhaengig zu machen.
 
 ## Implementierter Stand
 
@@ -53,7 +56,8 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - `crates/core-store` - SQLite-basierter lokaler Event-Store und Projektionen
   - `crates/core-sync` - Outbox-/Sync-Objekte fuer optionale Backend-Synchronisation
 - **MancuTG-ArenaC-Kern**
-  - `apps/desktop/src-tauri` - Offline-Bootstrap ueber Parser + Event-Store
+  - `apps/desktop/src-tauri` - Rust-Kern: CLI, Log-Watcher, SQLite, optional `serve` (HTTP-API fuer die UI)
+  - `apps/overwolf/` - Windows-Overwolf-App (Setup- und Hauptfenster, React-Client)
   - `apps/desktop/src` - route-nahe Query-, Export-, Privacy-, Setup- und Deck-Cache-Logik
   - `apps/desktop/src/app` und `apps/desktop/src/components` - React-basierte Application Shell auf Basis der vorhandenen ArenaC-Viewmodels
   - inklusive iOS/iPadOS-Offline-Importflow fuer `.log`-Dateien per Drag & Drop oder Ordnerimport
@@ -85,6 +89,9 @@ apps/
     src/
     src-tauri/
     tests/
+  overwolf/
+    public/
+    src/
 crates/
   core-domain/
   core-parser/
@@ -184,6 +191,30 @@ Backup-Bundle aus dem lokalen Store exportieren:
 cargo run -p mancutg-arenac -- export-backup "/pfad/zur/mancutg-arenac.sqlite3"
 ```
 
+#### MancuTG-ArenaC UI-Dienst (Loopback, fuer Overwolf / lokale UI)
+
+Der Rust-Binary startet einen **nur auf localhost** erreichbaren HTTP-Server (Standardport **17890**, Fallback bei Belegung: freier Port; Port steht in `mancutg-arenac-service.json` im Data-Verzeichnis):
+
+```bash
+npm run arenac:serve
+```
+
+Wichtige Endpunkte: `GET /health`, `GET /v1/detect-player-log`, `GET /v1/status`, `POST /v1/configure`, `POST /v1/watch/tick`, `GET /v1/store`, `GET /v1/settings`, `POST /v1/import/log-text`, …
+
+Smoke-Test fuer diese API:
+
+```bash
+npm run overwolf:smoke
+```
+
+Overwolf-Frontend bauen:
+
+```bash
+npm run overwolf:build
+```
+
+Windows-Paket (Zip, optional zu `.opk` umbenennen): `scripts/package-overwolf.ps1` ausfuehren (siehe `docs/release/overwolf-install.md`).
+
 #### MancuTG-backend lokal starten
 
 Den Foundations-API-Server lokal starten:
@@ -265,6 +296,7 @@ MANCUTG_BACKEND_STORE_PATH=/pfad/zur/store-datei npm run api:start
 - degradierbares MancuTG-ArenaC-Bootstrap aus lokalen Logs
 - iOS/iPadOS-Offline-Import mit Deduplizierung und `ios`-Tagging
 - TypeScript-Desktop-State fuer Setup, History, Collection, Draft, Privacy und Import-Center in MancuTG-ArenaC
+- **Overwolf + React-Client** (`apps/overwolf/`) mit interaktiver Toolbar; Anbindung an **`mancutg-arenac serve`** (Loopback-HTTP, Standardport 17890)
 - startbarer MancuTG-backend-Server fuer Health, gemeinsame Event-Ingestion, Sync und Archidekt-Import
 - separater Media-Ingest-Pfad fuer MancuTG-PaperC ueber `POST /media/sessions`
 - gemeinsame Session-/Event-Schnittstelle fuer MancuTG-ArenaC, MancuTG-PaperC und backendseitige Prozesse
@@ -274,7 +306,7 @@ MANCUTG_BACKEND_STORE_PATH=/pfad/zur/store-datei npm run api:start
 
 ### Noch nicht als vollstaendiges Produkt umgesetzt
 
-- echte Tauri-/React-Oberflaeche
+- Tauri-Desktop-Shell (Overwolf ist der aktuelle Windows-MVP)
 - Overlay/HUD
 - Replay-/Timeline-Viewer
 - persistentes Multi-User-/Auth-Backend

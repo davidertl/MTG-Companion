@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { ShellPanel } from "../components/ShellPanel";
 import { SummaryMetric } from "../components/SummaryMetric";
 import { ActionCluster } from "../components/ActionCluster";
@@ -5,8 +7,10 @@ import type { ArenaAppShellState } from "./buildArenaAppShellState";
 
 export function ArenaAppShell(props: {
   state: ArenaAppShellState;
+  /** When set, replaces the default action button cluster (e.g. live UI toolbar). */
+  toolbarSlot?: ReactNode;
 }) {
-  const { state } = props;
+  const { state, toolbarSlot } = props;
 
   return (
     <main
@@ -72,18 +76,20 @@ export function ArenaAppShell(props: {
                 {state.subtitle}
               </p>
             </div>
-            <ActionCluster
-              labels={[
-                state.watcherRunning
-                  ? state.actions.stopWatcherLabel
-                  : state.actions.startWatcherLabel,
-                state.actions.importLocalLabel,
-                state.actions.importIosFileLabel,
-                state.actions.importIosFolderLabel,
-                state.actions.exportBackupLabel,
-                state.actions.refreshLabel,
-              ]}
-            />
+            {toolbarSlot ?? (
+              <ActionCluster
+                labels={[
+                  state.watcherRunning
+                    ? state.actions.stopWatcherLabel
+                    : state.actions.startWatcherLabel,
+                  state.actions.importLocalLabel,
+                  state.actions.importIosFileLabel,
+                  state.actions.importIosFolderLabel,
+                  state.actions.exportBackupLabel,
+                  state.actions.refreshLabel,
+                ]}
+              />
+            )}
           </section>
 
           <ShellPanel

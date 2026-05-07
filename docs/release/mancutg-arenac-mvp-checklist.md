@@ -6,6 +6,8 @@
 - [ ] `npm test`
 - [ ] `npm run api:smoke`
 - [ ] `npm run arenac:build`
+- [ ] `npm run overwolf:smoke`
+- [ ] `npm run overwolf:build` (Overwolf-Bundle aus `apps/overwolf/`)
 - [ ] `npm run arenac:smoke`
 
 ## Local ArenaC CLI checks
@@ -15,6 +17,13 @@
 - [ ] `watch-log` writes checkpoints and avoids duplicate events on restart
 - [ ] `inspect-store` surfaces sessions, diagnostics, unknown events, and checkpoints
 - [ ] `export-backup` produces a parseable backup bundle
+
+## Overwolf + ArenaC sidecar (Windows MVP)
+
+- [ ] `mancutg-arenac serve` erreichbar unter `http://127.0.0.1:17890` (oder Port aus `mancutg-arenac-service.json`)
+- [ ] `GET /health` und `GET /v1/detect-player-log` liefern erwartete JSON-Struktur
+- [ ] Overwolf-`manifest.json` laesst sich sideloaden; Setup-Fenster oeffnet Main-Fenster
+- [ ] `docs/release/overwolf-install.md` entspricht dem tatsaechlichen Installationspfad
 
 ## Backend checks
 
@@ -34,7 +43,7 @@
 
 ## Known limitations before a broader release
 
-- No fully bundled Tauri desktop application package yet; the current release path is still anchored on the Rust desktop core and shell code
+- No fully bundled Tauri desktop application package yet; Windows MVP ships as **Overwolf + sidecar** (`mancutg-arenac serve`) instead
 - No full production MTGA parser coverage yet; current detailed-log support is a meaningful first step, not the final parser surface
 - No multi-user auth backend
 - No replay UI

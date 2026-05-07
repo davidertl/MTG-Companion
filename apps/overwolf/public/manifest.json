@@ -1,0 +1,40 @@
+{
+  "manifest_version": 1,
+  "type": "WebApp",
+  "meta": {
+    "name": "MancuTG-ArenaC",
+    "author": "MancuTG",
+    "version": "0.1.0",
+    "minimum-overwolf-version": "0.169.0",
+    "description": "Offline-first MTG Arena log companion (windowed MVP).",
+    "dock_button_title": "ArenaC"
+  },
+  "permissions": ["GameInfo", "FileSystem"],
+  "data": {
+    "game_targeting": {
+      "type": "dedicated",
+      "game_ids": [21566]
+    },
+    "game_events": [21566],
+    "launch_events": {
+      "game_launch": [21566]
+    },
+    "start_window": "setup",
+    "windows": {
+      "setup": {
+        "file": "setup.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 520, "height": 420 },
+        "min_size": { "width": 400, "height": 320 }
+      },
+      "main": {
+        "file": "main.html",
+        "transparent": false,
+        "resizable": true,
+        "size": { "width": 1100, "height": 720 },
+        "min_size": { "width": 800, "height": 560 }
+      }
+    }
+  }
+}

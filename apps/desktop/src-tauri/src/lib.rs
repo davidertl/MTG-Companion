@@ -1,3 +1,9 @@
+mod serve;
+
+pub use serve::{
+    default_player_log_path, parse_serve_args, run_serve, ServiceHandshake, DEFAULT_LOOPBACK_PORT,
+};
+
 use core_domain::{
     CollectionSnapshot, DraftPick, EventType, ImportSourceKind, InventorySnapshot, LogSession,
     MatchRecord, PlatformTag,
@@ -804,7 +810,7 @@ fn update_allowed_purpose(allowed_purposes: &mut Vec<String>, purpose: &str, ena
 }
 
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
+    "Usage:\n  mancutg-arenac serve [--data-dir <path>] [--port <port>]\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
 }
 
 pub fn run_cli(args: &[String]) -> Result<String, String> {
