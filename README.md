@@ -38,6 +38,7 @@ Dieses Repository definiert die Zielarchitektur fuer eine neue App, die diese Fa
 - `docs/release/README.md` - Release-Hinweise fuer den aktuellen ArenaC-MVP-Stand
 - `docs/release/mancutg-arenac-mvp-checklist.md` - konkrete Release-Checkliste fuer MancuTG-ArenaC
 - `docs/release/overwolf-install.md` - Installation der Windows-Overwolf-Variante von MancuTG-ArenaC
+- `DEMO_CHECKLIST.md` - integrierte Deadline-Abnahme fuer ArenaC, PaperC und Backend/WebUI
 - `LICENSE` - Apache License 2.0
 
 ## Architektur in einem Satz
@@ -225,9 +226,15 @@ Verfuegbare Endpunkte:
 
 - `GET /health`
 - `POST /events`
+- `POST /v1/ingest/batches`
+- `GET /v1/overview`
+- `GET /v1/sessions`
+- `GET /v1/live`
 - `POST /media/sessions`
 - `POST /sync`
 - `GET /integrations/archidekt/:deckId`
+
+Die neue ingest/read-Vertragslinie fuer ArenaC + PaperC ist unter `POST /v1/ingest/batches` sowie den `GET /v1/*` Read-APIs umgesetzt; die minimale Beobachtungsoberflaeche liegt in `services/web`.
 
 Gemeinsamer Session-/Event-Batchvertrag fuer MancuTG-ArenaC, MancuTG-PaperC und backendseitige Prozesse:
 
