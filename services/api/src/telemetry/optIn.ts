@@ -3,7 +3,7 @@ import {
   telemetryEventSchema,
   type PrivacySettings,
   type TelemetryEvent,
-} from "../../../../packages/shared-schema/src/index";
+} from "../../../../packages/shared-schema/src/index.ts";
 
 export interface TelemetryReceipt {
   accepted: boolean;

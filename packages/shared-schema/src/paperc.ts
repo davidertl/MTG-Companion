@@ -4,8 +4,8 @@ import type {
   BackendEventEnvelope,
   BackendEventSession,
   EventSourceApp,
-} from "./events";
-import { tournamentContextSchema } from "./tournaments";
+} from "./events.ts";
+import { tournamentContextSchema } from "./tournaments.ts";
 
 export const papercEventTypeSchema = z.enum([
   "paperc.observation.detected",

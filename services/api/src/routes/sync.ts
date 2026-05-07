@@ -1,6 +1,6 @@
-import { syncObjectSchema, type SyncObject } from "../../../../packages/shared-schema/src/index";
-import { resolveSessionMode } from "../auth/optionalMode";
-import { applySyncObjects, type SyncStore } from "../domain/syncService";
+import { syncObjectSchema, type SyncObject } from "../../../../packages/shared-schema/src/index.ts";
+import { resolveSessionMode } from "../auth/optionalMode.ts";
+import { applySyncObjects, type SyncStore } from "../domain/syncService.ts";
 
 export interface SyncRouteResult {
   sessionMode: "anonymous" | "authenticated";

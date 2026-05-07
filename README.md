@@ -54,6 +54,7 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
   - `apps/desktop/src-tauri` - Offline-Bootstrap ueber Parser + Event-Store
   - `apps/desktop/src` - route-nahe Query-, Export-, Privacy-, Setup- und Deck-Cache-Logik
   - inklusive iOS/iPadOS-Offline-Importflow fuer `.log`-Dateien per Drag & Drop oder Ordnerimport
+  - Live-Log-Watcher mit Checkpoints, Partial-Line-Buffering und Rotation-/Truncation-Erkennung
 - **MancuTG-backend-Grundlage**
   - `services/api/src` - optionale Sync-, Auth-, Archidekt-Import- und Telemetry-Services
   - `services/worker/src` - Hintergrundjob-Grundlage fuer serverseitige Verarbeitungsaufgaben

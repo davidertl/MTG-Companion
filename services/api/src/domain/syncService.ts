@@ -1,4 +1,4 @@
-import { syncObjectSchema, type SyncObject } from "../../../../packages/shared-schema/src/index";
+import { syncObjectSchema, type SyncObject } from "../../../../packages/shared-schema/src/index.ts";
 
 export interface SyncStore {
   values: SyncObject[];

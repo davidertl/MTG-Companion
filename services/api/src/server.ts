@@ -2,12 +2,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { URL } from "node:url";
 import { ZodError } from "zod";
 
-import { createInMemoryEventStore, type EventStore } from "./domain/eventService";
-import { createInMemorySyncStore, type SyncStore } from "./domain/syncService";
-import { mediaSessionsRoute } from "./routes/media/index";
-import { buildArchidektImportRoute, type ArchidektFetcher } from "./routes/integrations/archidekt/import";
-import { eventsRoute } from "./routes/events";
-import { syncRoute } from "./routes/sync";
+import { createInMemoryEventStore, type EventStore } from "./domain/eventService.ts";
+import { createInMemorySyncStore, type SyncStore } from "./domain/syncService.ts";
+import { mediaSessionsRoute } from "./routes/media/index.ts";
+import { buildArchidektImportRoute, type ArchidektFetcher } from "./routes/integrations/archidekt/import.ts";
+import { eventsRoute } from "./routes/events.ts";
+import { syncRoute } from "./routes/sync.ts";
 
 export interface ApiServerOptions {
   store?: SyncStore;

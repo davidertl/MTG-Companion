@@ -42,13 +42,13 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 - iOS/iPadOS-Offline-Importpfad in MancuTG-ArenaC
 - minimales MancuTG-PaperC-Contract-Skeleton unter `apps/paperc/`
 - erster ArenaC-MTGA-Detailed-Log-Schritt mit Fixture-basiertem Golden-Test fuer MTGA-like JSON-Logfragmente
+- ArenaC Live-Log-Watcher mit Checkpoints, Rotation-/Truncation-Erkennung und Partial-Line-Buffering
 - Archidekt read-only Connector
 - durchgehende TS-/Rust-/Python-Testabdeckung fuer diese Foundations
 
 ### Noch nicht produktvollstaendig
 
 - noch kein umfassender produktionsreifer MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
-- kein Live-Log-Watcher mit Checkpointing fuer MancuTG-ArenaC
 - keine echte Tauri-/React-Oberflaeche fuer MancuTG-ArenaC
 - keine vollstaendigen lokalen Read Models / Export-/Reprocessing-Flows fuer reale MTGA-Logs
 - keine Privacy-/Settings-/Consent-Oberflaechen fuer MancuTG-ArenaC
@@ -237,6 +237,8 @@ Includes:
 - inkrementelles Lesen
 - persistente Checkpoints
 - Log-Rotation / Truncation / Restart-Verhalten
+
+**Status:** im aktuellen Branch umgesetzt und gruen verifiziert
 
 ### Phase 5 — ArenaC local read models, export and reprocessing
 

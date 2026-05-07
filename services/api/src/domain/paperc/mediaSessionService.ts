@@ -2,8 +2,8 @@ import {
   mediaCaptureSessionSchema,
   mediaIngestRequestSchema,
   type MediaArtifact,
-} from "../../../../../packages/shared-schema/src/index";
-import { upsertMediaState, type EventStore } from "../eventService";
+} from "../../../../../packages/shared-schema/src/index.ts";
+import { upsertMediaState, type EventStore } from "../eventService.ts";
 
 export interface MediaIngestResult {
   captureSessionId: string;

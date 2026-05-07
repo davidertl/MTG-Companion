@@ -1,6 +1,6 @@
-import { mediaIngestRequestSchema } from "../../../../../packages/shared-schema/src/index";
-import type { EventStore } from "../../domain/eventService";
-import { ingestMediaSession } from "../../domain/paperc/mediaSessionService";
+import { mediaIngestRequestSchema } from "../../../../../packages/shared-schema/src/index.ts";
+import type { EventStore } from "../../domain/eventService.ts";
+import { ingestMediaSession } from "../../domain/paperc/mediaSessionService.ts";
 
 export interface MediaIngestRouteResult {
   captureSessionId: string;

@@ -1,4 +1,4 @@
-import { startApiServer } from "./server";
+import { startApiServer } from "./server.ts";
 
 const server = await startApiServer(0);
 

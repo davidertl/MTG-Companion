@@ -1,7 +1,7 @@
 import {
   archidektDeckSnapshotSchema,
   type ArchidektDeckSnapshot,
-} from "../../../../../../packages/shared-schema/src/archidekt";
+} from "../../../../../../packages/shared-schema/src/archidekt.ts";
 
 export type ArchidektFetcher = (deckId: string) => Promise<unknown>;
 

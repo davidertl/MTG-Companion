@@ -2,8 +2,8 @@ import {
   backendEventBatchEnvelopeSchema,
   type BackendEventEnvelope,
   type BackendEventSession,
-} from "../../../../packages/shared-schema/src/index";
-import { applyBackendEventBatch, type EventStore } from "../domain/eventService";
+} from "../../../../packages/shared-schema/src/index.ts";
+import { applyBackendEventBatch, type EventStore } from "../domain/eventService.ts";
 
 export interface EventsRouteResult {
   acceptedSessionCount: number;

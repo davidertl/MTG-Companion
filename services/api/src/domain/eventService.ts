@@ -11,11 +11,11 @@ import {
   type BackendEventSession,
   type MediaArtifact,
   type MediaCaptureSession,
-} from "../../../../packages/shared-schema/src/index";
+} from "../../../../packages/shared-schema/src/index.ts";
 import {
   validatePapercEventContract,
   validatePapercSessionContract,
-} from "../../../../packages/shared-schema/src/paperc";
+} from "../../../../packages/shared-schema/src/paperc.ts";
 
 type PersistedStoreFile = {
   sessions: BackendEventSession[];

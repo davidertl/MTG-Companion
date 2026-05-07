@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
-import { createPersistentEventStore } from "./domain/eventService";
-import { startApiServer } from "./server";
+import { createPersistentEventStore } from "./domain/eventService.ts";
+import { startApiServer } from "./server.ts";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 8787;
 const eventStorePath =

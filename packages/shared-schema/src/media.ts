@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { papercCaptureContextSchema } from "./paperc";
-import { tournamentContextSchema } from "./tournaments";
+import { papercCaptureContextSchema } from "./paperc.ts";
+import { tournamentContextSchema } from "./tournaments.ts";
 
 export const mediaArtifactKindSchema = z.enum([
   "video",
