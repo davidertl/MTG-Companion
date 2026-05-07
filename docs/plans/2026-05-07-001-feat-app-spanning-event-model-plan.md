@@ -35,7 +35,7 @@ Aktuell teilen MancuTG-ArenaC und MancuTG-PaperC zwar bereits denselben `/events
 
 - Diese Arbeit fuehrt die gemeinsame Zielstruktur und deren Foundations-Implementierung ein, nicht die gesamte spaetere Projektions-, Review- oder Media-Pipeline.
 - ArenaC- oder PaperC-spezifische Vollmodelle werden nur soweit modelliert, wie es fuer den gemeinsamen Kernvertrag erforderlich ist.
-- Es wird keine neue persistente Datenbanktopologie ausserhalb des bestehenden In-Memory-Backends eingefuehrt.
+- Es wird keine neue relationale Produktionsdatenbank eingefuehrt; eine file-basierte persistente Speicherung fuer Session-/Event-/Media-Metadaten ist Teil dieses Schritts.
 
 ### Deferred to Follow-Up Work
 

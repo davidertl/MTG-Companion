@@ -112,6 +112,25 @@ describe("api server", () => {
             gameMode: "paper",
             startedAt: "2026-05-06T22:39:10Z",
             streamId: "table-12",
+            metadata: {
+              capture: {
+                tournamentId: "tournament-1",
+                roundId: "round-3",
+                tableId: "table-12",
+                matchId: "match-2",
+                gameKey: "mtg-paper",
+                captureSessionId: "capture-1",
+                cameraId: "cam-12",
+              },
+            },
+          },
+          {
+            sourceSessionId: "backend-session-1",
+            sourceApp: "mancutg-backend",
+            sourceKind: "review-decision",
+            platform: "server",
+            gameMode: "service",
+            startedAt: "2026-05-06T22:39:20Z",
           },
         ],
         events: [
@@ -138,20 +157,62 @@ describe("api server", () => {
             eventId: "paperc-1",
             sourceApp: "mancutg-paperc",
             sourceSessionId: "paper-session-1",
-            eventType: "paper.round.completed",
+            eventType: "paperc.observation.detected",
             occurredAt: "2026-05-06T22:41:00Z",
             streamId: "table-12",
+            matchId: "match-2",
+            gameId: "game-2",
             provenance: [
               {
                 sourceKind: "paper-camera",
                 sourceSessionId: "paper-session-1",
                 cameraId: "cam-12",
                 frameNo: 1024,
+                modelVersion: "paper-model/0.1.0",
               },
             ],
+            confidence: 0.84,
+            reviewStatus: "pending",
             payload: {
-              round: 3,
-              table: 12,
+              tournamentId: "tournament-1",
+              roundId: "round-3",
+              tableId: "table-12",
+              matchId: "match-2",
+              gameKey: "mtg-paper",
+              captureSessionId: "capture-1",
+              cameraId: "cam-12",
+              observationKind: "board-state",
+              details: {
+                phase: "main-1",
+              },
+            },
+          },
+          {
+            eventId: "backend-1",
+            sourceApp: "mancutg-backend",
+            sourceSessionId: "backend-session-1",
+            eventType: "paperc.review.resolved",
+            occurredAt: "2026-05-06T22:42:00Z",
+            matchId: "match-2",
+            provenance: [
+              {
+                sourceKind: "review-decision",
+                sourceSessionId: "backend-session-1",
+              },
+            ],
+            reviewStatus: "corrected",
+            supersedesEventId: "paperc-1",
+            payload: {
+              tournamentId: "tournament-1",
+              roundId: "round-3",
+              tableId: "table-12",
+              matchId: "match-2",
+              gameKey: "mtg-paper",
+              captureSessionId: "capture-1",
+              cameraId: "cam-12",
+              reviewId: "review-1",
+              resolution: "corrected",
+              targetEventId: "paperc-1",
             },
           },
         ],
@@ -160,13 +221,76 @@ describe("api server", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      acceptedSessionCount: 2,
-      acceptedEventCount: 2,
+      acceptedSessionCount: 3,
+      acceptedEventCount: 3,
       deduplicatedCount: 0,
-      totalStoredSessions: 2,
-      totalStoredEvents: 2,
-      sourceApps: ["mancutg-arenac", "mancutg-paperc"],
-      sourceSessionIds: ["arena-session-1", "paper-session-1"],
+      totalStoredSessions: 3,
+      totalStoredEvents: 3,
+      sourceApps: expect.arrayContaining([
+        "mancutg-arenac",
+        "mancutg-paperc",
+        "mancutg-backend",
+      ]),
+      sourceSessionIds: expect.arrayContaining([
+        "arena-session-1",
+        "paper-session-1",
+        "backend-session-1",
+      ]),
+    });
+  });
+
+  it("ingests media sessions separately from /events", async () => {
+    const server = await startApiServer(0);
+    servers.push(server);
+    const address = `http://127.0.0.1:${server.port}`;
+
+    const response = await fetch(`${address}/media/sessions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        idempotencyKey: "media-batch-1",
+        captureSession: {
+          captureSessionId: "capture-1",
+          sourceApp: "mancutg-paperc",
+          platform: "camera-rig",
+          cameraId: "cam-12",
+          streamId: "table-12",
+          startedAt: "2026-05-06T22:39:10Z",
+          tournament: {
+            tournamentId: "tournament-1",
+            roundId: "round-3",
+            tableId: "table-12",
+            matchId: "match-2",
+            gameKey: "mtg-paper",
+          },
+        },
+        artifacts: [
+          {
+            artifactId: "clip-1",
+            tournamentId: "tournament-1",
+            roundId: "round-3",
+            tableId: "table-12",
+            matchId: "match-2",
+            gameKey: "mtg-paper",
+            captureSessionId: "capture-1",
+            cameraId: "cam-12",
+            artifactKind: "clip",
+            uri: "s3://bucket/clip-1.mp4",
+            mimeType: "video/mp4",
+            capturedAt: "2026-05-06T22:40:00Z",
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      captureSessionId: "capture-1",
+      acceptedArtifactCount: 1,
+      duplicateArtifactCount: 0,
+      duplicateBatch: false,
     });
   });
 
@@ -187,7 +311,7 @@ describe("api server", () => {
             eventId: "paper-unknown",
             sourceApp: "mancutg-paperc",
             sourceSessionId: "missing-session",
-            eventType: "paper.round.completed",
+            eventType: "paperc.observation.detected",
             occurredAt: "2026-05-06T22:41:00Z",
             provenance: [
               {
@@ -196,7 +320,14 @@ describe("api server", () => {
               },
             ],
             payload: {
-              round: 3,
+              tournamentId: "tournament-1",
+              roundId: "round-3",
+              tableId: "table-12",
+              matchId: "match-2",
+              gameKey: "mtg-paper",
+              captureSessionId: "capture-1",
+              cameraId: "cam-12",
+              observationKind: "board-state",
             },
           },
         ],

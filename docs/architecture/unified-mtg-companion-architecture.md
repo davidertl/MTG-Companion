@@ -311,6 +311,13 @@ MancuTG-backend soll Event-Erfassung nicht nur fuer MancuTG-ArenaC, sondern auch
 - `payload` bleibt fuer app-spezifische Erweiterungen erhalten, ist aber nicht mehr der alleinige semantische Vertrag.
 - Sync-Objekte bleiben ein eigener Vertrag fuer Zustandsreplikation; Event-Ingestion ist eine parallele, produktuebergreifende Schnittstelle.
 
+### Aktuell implementierte Erweiterungen
+
+- Session-/Event-Batches werden ueber `POST /events` ingestet.
+- PaperC-spezifische Vertragsmodule existieren in `packages/shared-schema/src/paperc.ts`, `packages/shared-schema/src/tournaments.ts` und `packages/shared-schema/src/media.ts`.
+- Separate Media-Ingestion fuer PaperC laeuft ueber `POST /media/sessions`.
+- Die MancuTG-backend-Runtime nutzt eine JSON-basierte persistente Store-Datei fuer Session-/Event-/Media-Metadaten.
+
 ---
 
 ## Archidekt-Integration

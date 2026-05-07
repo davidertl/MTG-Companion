@@ -57,10 +57,11 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
 - **MancuTG-backend-Grundlage**
   - `services/api/src` - optionale Sync-, Auth-, Archidekt-Import- und Telemetry-Services
   - `services/worker/src` - Hintergrundjob-Grundlage fuer serverseitige Verarbeitungsaufgaben
+  - persistente JSON-Speicherung fuer Session-/Event-/Media-Metadaten im Runtime-Server
 - **Archidekt-Connector fuer MancuTG-backend**
   - `services/archidekt-connector/src/connector.py` - read-only Import ueber `pyrchidekt`-kompatiblen Adapter
 - **Gemeinsame Vertrage**
-  - `packages/shared-schema/src` - zod-validierte Schemas fuer Sync-, Privacy- und Deck-Snapshots
+  - `packages/shared-schema/src` - zod-validierte Schemas fuer Sync, Privacy, Sessions, Events, PaperC-Turnierkontext und Media-Ingest
 
 ## Repository-Struktur
 
@@ -150,6 +151,7 @@ Verfuegbare Endpunkte:
 
 - `GET /health`
 - `POST /events`
+- `POST /media/sessions`
 - `POST /sync`
 - `GET /integrations/archidekt/:deckId`
 
@@ -192,6 +194,24 @@ Gemeinsamer Session-/Event-Batchvertrag fuer MancuTG-ArenaC, MancuTG-PaperC und 
 }
 ```
 
+PaperC-spezifische Shared Contracts liegen jetzt in:
+
+- `packages/shared-schema/src/paperc.ts`
+- `packages/shared-schema/src/tournaments.ts`
+- `packages/shared-schema/src/media.ts`
+
+Die MancuTG-backend-Runtime speichert Session-/Event-/Media-Metadaten persistent in einer JSON-Datei. Standardpfad:
+
+```text
+./mancutg-backend-store.json
+```
+
+Uebersteuerbar via:
+
+```bash
+MANCUTG_BACKEND_STORE_PATH=/pfad/zur/store-datei npm run api:start
+```
+
 ## Audit des aktuellen Zustands
 
 ### Bereits funktional
@@ -201,7 +221,9 @@ Gemeinsamer Session-/Event-Batchvertrag fuer MancuTG-ArenaC, MancuTG-PaperC und 
 - iOS/iPadOS-Offline-Import mit Deduplizierung und `ios`-Tagging
 - TypeScript-Desktop-State fuer Setup, History, Collection, Draft, Privacy und Import-Center in MancuTG-ArenaC
 - startbarer MancuTG-backend-Server fuer Health, gemeinsame Event-Ingestion, Sync und Archidekt-Import
+- separater Media-Ingest-Pfad fuer MancuTG-PaperC ueber `POST /media/sessions`
 - gemeinsame Session-/Event-Schnittstelle fuer MancuTG-ArenaC, MancuTG-PaperC und backendseitige Prozesse
+- persistente Speicherung fuer Session-/Event-/Media-Metadaten im MancuTG-backend
 - read-only Archidekt-Connector in Python
 - MancuTG-PaperC ist als eigenstaendiger Produktname reserviert, aber noch nicht implementiert
 

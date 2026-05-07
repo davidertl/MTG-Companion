@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 
 import { createInMemoryEventStore, type EventStore } from "./domain/eventService";
 import { createInMemorySyncStore, type SyncStore } from "./domain/syncService";
+import { mediaSessionsRoute } from "./routes/media/index";
 import { buildArchidektImportRoute, type ArchidektFetcher } from "./routes/integrations/archidekt/import";
 import { eventsRoute } from "./routes/events";
 import { syncRoute } from "./routes/sync";
@@ -56,6 +57,12 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
       if (method === "POST" && url.pathname === "/events") {
         const body = await readJsonBody(request);
         const result = eventsRoute(body, eventStore);
+        return sendJson(response, 200, result);
+      }
+
+      if (method === "POST" && url.pathname === "/media/sessions") {
+        const body = await readJsonBody(request);
+        const result = mediaSessionsRoute(body, eventStore);
         return sendJson(response, 200, result);
       }
 

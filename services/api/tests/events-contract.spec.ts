@@ -5,6 +5,29 @@ import {
   eventsRoute,
 } from "../src/index";
 
+function papercSession(sourceSessionId: string) {
+  return {
+    sourceSessionId,
+    sourceApp: "mancutg-paperc" as const,
+    sourceKind: "paper-camera" as const,
+    platform: "camera-rig-a",
+    gameMode: "paper" as const,
+    startedAt: "2026-05-06T22:41:00Z",
+    streamId: "table-12",
+    metadata: {
+      capture: {
+        tournamentId: "tournament-1",
+        roundId: "round-4",
+        tableId: "table-12",
+        matchId: "match-2",
+        gameKey: "mtg-paper",
+        captureSessionId: sourceSessionId,
+        cameraId: "cam-a",
+      },
+    },
+  };
+}
+
 describe("eventsRoute", () => {
   it("accepts a shared batch envelope from MancuTG-ArenaC, MancuTG-PaperC, and MancuTG-backend", () => {
     const store = createInMemoryEventStore();
@@ -21,14 +44,7 @@ describe("eventsRoute", () => {
             gameMode: "arena",
             startedAt: "2026-05-06T22:40:00Z",
           },
-          {
-            sourceSessionId: "paper-session-1",
-            sourceApp: "mancutg-paperc",
-            sourceKind: "paper-camera",
-            platform: "camera-rig-a",
-            gameMode: "paper",
-            startedAt: "2026-05-06T22:41:00Z",
-          },
+          papercSession("paper-session-1"),
           {
             sourceSessionId: "backend-session-1",
             sourceApp: "mancutg-backend",
@@ -63,11 +79,8 @@ describe("eventsRoute", () => {
             eventId: "paper-1",
             sourceApp: "mancutg-paperc",
             sourceSessionId: "paper-session-1",
-            eventType: "paper.round.captured",
+            eventType: "paperc.observation.detected",
             occurredAt: "2026-05-06T22:51:00Z",
-            matchId: "match-2",
-            gameId: "game-2",
-            streamId: "table-12",
             provenance: [
               {
                 sourceKind: "paper-camera",
@@ -80,15 +93,25 @@ describe("eventsRoute", () => {
             confidence: 0.84,
             reviewStatus: "pending",
             payload: {
+              tournamentId: "tournament-1",
               roundId: "round-4",
-              table: "12",
+              tableId: "table-12",
+              matchId: "match-2",
+              gameKey: "mtg-paper",
+              captureSessionId: "paper-session-1",
+              cameraId: "cam-a",
+              observationKind: "board-state",
+              details: {
+                round: 3,
+                table: 12,
+              },
             },
           },
           {
             eventId: "backend-1",
             sourceApp: "mancutg-backend",
             sourceSessionId: "backend-session-1",
-            eventType: "review.resolved",
+            eventType: "paperc.review.resolved",
             occurredAt: "2026-05-06T22:52:00Z",
             supersedesEventId: "paper-1",
             provenance: [
@@ -99,7 +122,17 @@ describe("eventsRoute", () => {
             ],
             reviewStatus: "corrected",
             payload: {
+              tournamentId: "tournament-1",
+              roundId: "round-4",
+              tableId: "table-12",
+              matchId: "match-2",
+              gameKey: "mtg-paper",
+              captureSessionId: "paper-session-1",
+              cameraId: "cam-a",
+              reviewId: "review-1",
               resolution: "confirmed",
+              targetEventId: "paper-1",
+              correctedFields: {},
             },
           },
         ],
@@ -197,51 +230,59 @@ describe("eventsRoute", () => {
     const result = eventsRoute(
       {
         sessions: [
-          {
-            sourceSessionId: "arena-session-1",
-            sourceApp: "mancutg-arenac",
-            sourceKind: "arena-log",
-            platform: "windows",
-            gameMode: "arena",
-            startedAt: "2026-05-06T22:40:00Z",
-          },
-          {
-            sourceSessionId: "arena-session-2",
-            sourceApp: "mancutg-arenac",
-            sourceKind: "arena-log",
-            platform: "windows",
-            gameMode: "arena",
-            startedAt: "2026-05-06T22:45:00Z",
-          },
+          papercSession("paper-session-1"),
+          papercSession("paper-session-2"),
         ],
         events: [
           {
-            eventId: "arena-1",
-            sourceApp: "mancutg-arenac",
-            sourceSessionId: "arena-session-1",
-            eventType: "arena.match.finished",
+            eventId: "paper-1",
+            sourceApp: "mancutg-paperc",
+            sourceSessionId: "paper-session-1",
+            eventType: "paperc.observation.detected",
             occurredAt: "2026-05-06T22:50:00Z",
             provenance: [
               {
-                sourceKind: "arena-log",
-                sourceSessionId: "arena-session-1",
+                sourceKind: "paper-camera",
+                sourceSessionId: "paper-session-1",
+                cameraId: "cam-a",
               },
             ],
-            payload: { matchId: "match-1" },
+            payload: {
+              tournamentId: "tournament-1",
+              roundId: "round-4",
+              tableId: "table-12",
+              matchId: "match-2",
+              gameKey: "mtg-paper",
+              captureSessionId: "paper-session-1",
+              cameraId: "cam-a",
+              observationKind: "board-state",
+              details: {},
+            },
           },
           {
-            eventId: "arena-1",
-            sourceApp: "mancutg-arenac",
-            sourceSessionId: "arena-session-2",
-            eventType: "arena.match.finished",
+            eventId: "paper-1",
+            sourceApp: "mancutg-paperc",
+            sourceSessionId: "paper-session-2",
+            eventType: "paperc.observation.detected",
             occurredAt: "2026-05-06T22:55:00Z",
             provenance: [
               {
-                sourceKind: "arena-log",
-                sourceSessionId: "arena-session-2",
+                sourceKind: "paper-camera",
+                sourceSessionId: "paper-session-2",
+                cameraId: "cam-a",
               },
             ],
-            payload: { matchId: "match-2" },
+            payload: {
+              tournamentId: "tournament-1",
+              roundId: "round-4",
+              tableId: "table-12",
+              matchId: "match-2",
+              gameKey: "mtg-paper",
+              captureSessionId: "paper-session-2",
+              cameraId: "cam-a",
+              observationKind: "board-state",
+              details: {},
+            },
           },
         ],
       },
@@ -309,15 +350,26 @@ describe("eventsRoute", () => {
               eventId: "paper-1",
               sourceApp: "mancutg-paperc",
               sourceSessionId: "missing-session",
-              eventType: "paper.round.captured",
+              eventType: "paperc.observation.detected",
               occurredAt: "2026-05-06T22:51:00Z",
               provenance: [
                 {
                   sourceKind: "paper-camera",
                   sourceSessionId: "missing-session",
+                  cameraId: "cam-a",
                 },
               ],
-              payload: {},
+              payload: {
+                tournamentId: "tournament-1",
+                roundId: "round-4",
+                tableId: "table-12",
+                matchId: "match-2",
+                gameKey: "mtg-paper",
+                captureSessionId: "missing-session",
+                cameraId: "cam-a",
+                observationKind: "board-state",
+                details: {},
+              },
             },
           ],
         },

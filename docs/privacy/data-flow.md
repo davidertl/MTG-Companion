@@ -32,6 +32,7 @@ MancuTG-backend is additive only. It may receive:
 
 - sync objects produced from local entities
 - shared backend event batches produced by MancuTG-ArenaC, MancuTG-PaperC, or MancuTG-backend
+- separate PaperC media session/artefact batches via `/media/sessions`
 - validated Archidekt import payloads
 - opt-in telemetry events
 
@@ -49,22 +50,32 @@ Shared event/session core fields currently modeled:
 - `eventId`
 - `eventType`
 - `occurredAt`
+- optional `matchId`, `gameId`, `streamId`, `actor`, `object`, `objects`, `targets`
 - `provenance[]`
 - `confidence`
 - `reviewStatus`
 
-### Unified event envelope
+PaperC-specific shared contracts now live in:
 
-Cross-client event ingestion uses one shared envelope shape regardless of producer:
+- `packages/shared-schema/src/paperc.ts`
+- `packages/shared-schema/src/tournaments.ts`
+- `packages/shared-schema/src/media.ts`
 
-- `eventId`
-- `sourceApp` (`mancutg-arenac` or `mancutg-paperc`)
-- `eventType`
-- `occurredAt`
-- `payload`
+Current runtime persistence for session/event/media metadata is file-backed via:
 
-This keeps backend event ingestion uniform even when Arena and paper-card tracking
-produce different domain-specific payloads.
+- default path: `./mancutg-backend-store.json`
+- override: `MANCUTG_BACKEND_STORE_PATH`
+
+### Shared batch envelope
+
+Cross-client event ingestion now uses one batch structure regardless of producer:
+
+- optional `idempotencyKey`
+- `sessions[]`
+- `events[]`
+
+This keeps MancuTG-backend ingestion uniform even when ArenaC, PaperC, and
+backend-produced review/correction flows emit different domain-specific details.
 
 MancuTG-backend must not be required for:
 

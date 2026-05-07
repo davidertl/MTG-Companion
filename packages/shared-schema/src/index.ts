@@ -34,4 +34,7 @@ export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;
 
 export * from "./events";
 export * from "./imports";
+export * from "./media";
+export * from "./paperc";
 export * from "./privacy";
+export * from "./tournaments";
