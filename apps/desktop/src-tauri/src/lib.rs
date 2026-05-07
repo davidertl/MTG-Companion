@@ -374,6 +374,9 @@ pub fn load_arena_settings(optional_settings_path: Option<&str>) -> Result<Arena
 
     let raw = fs::read_to_string(&settings_path)
         .map_err(|error| format!("failed to read settings file {}: {error}", settings_path.display()))?;
+    if raw.trim().is_empty() {
+        return Ok(ArenaSettings::default());
+    }
     serde_json::from_str(&raw)
         .map_err(|error| format!("failed to parse settings file {}: {error}", settings_path.display()))
 }

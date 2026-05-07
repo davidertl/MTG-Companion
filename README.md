@@ -35,6 +35,8 @@ Dieses Repository definiert die Zielarchitektur fuer eine neue App, die diese Fa
 - `docs/architecture/unified-mtg-companion-architecture.md` - Produkt- und Zielarchitektur
 - `docs/plans/2026-05-06-001-feat-unified-mtg-companion-platform-plan.md` - technische Umsetzungsplanung
 - `docs/privacy/data-flow.md` - dokumentierter Datenfluss fuer Offline-, Sync- und Telemetriepfade
+- `docs/release/README.md` - Release-Hinweise fuer den aktuellen ArenaC-MVP-Stand
+- `docs/release/mancutg-arenac-mvp-checklist.md` - konkrete Release-Checkliste fuer MancuTG-ArenaC
 - `LICENSE` - Apache License 2.0
 
 ## Architektur in einem Satz
@@ -69,6 +71,9 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
 - **Archidekt-Connector fuer MancuTG-backend**
   - `services/archidekt-connector/src/connector.py` - read-only Import ueber `pyrchidekt`-kompatiblen Adapter
   - runtimefaehiger Python-Connector-Pfad fuer read-only Deckimporte inklusive Fehlerabbildung und Cache im Backend
+- **ArenaC MVP-Release-Haertung**
+  - `scripts/arenac_smoke.sh` - build- und runtimebezogener CLI-Smoke-Test
+  - `docs/release/` - Release-Hinweise, MVP-Checkliste und bekannte Grenzen des aktuellen Lieferpfads
 - **Gemeinsame Vertrage**
   - `packages/shared-schema/src` - zod-validierte Schemas fuer Sync, Privacy, Sessions, Events, PaperC-Turnierkontext und Media-Ingest
 
@@ -124,6 +129,13 @@ API-Smoke-Test separat:
 
 ```bash
 npm run api:smoke
+```
+
+ArenaC-Build und CLI-Runtime-Smoke:
+
+```bash
+npm run arenac:build
+npm run arenac:smoke
 ```
 
 ### Benutzbare Foundations-Einstiegspunkte

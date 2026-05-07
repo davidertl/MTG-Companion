@@ -44,8 +44,14 @@ jobs:
       - name: API smoke test
         run: npm run api:smoke
 
+      - name: ArenaC build
+        run: npm run arenac:build
+
       - name: Rust tests
         run: cargo test --workspace
+
+      - name: ArenaC smoke test
+        run: npm run arenac:smoke
 
       - name: Python tests
         run: python3 -m unittest discover -s services/archidekt-connector/tests -p 'test_*.py'

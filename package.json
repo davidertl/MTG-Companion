@@ -5,6 +5,8 @@
   "scripts": {
     "api:start": "node --experimental-strip-types services/api/src/main.ts",
     "api:smoke": "node --experimental-strip-types services/api/src/smoke.ts",
+    "arenac:build": "cargo build -p mancutg-arenac",
+    "arenac:smoke": "bash scripts/arenac_smoke.sh",
     "desktop:help": "cargo run -p mancutg-arenac -- --help",
     "typecheck": "tsc --noEmit",
     "test:ts": "vitest run",
