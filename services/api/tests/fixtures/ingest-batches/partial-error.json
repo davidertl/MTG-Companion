@@ -1,0 +1,13 @@
+{
+  "batchId": "batch_01",
+  "accepted": 8,
+  "duplicates": 2,
+  "rejected": 1,
+  "errors": [
+    {
+      "eventId": "paper-session-123-obs-3-0",
+      "code": "invalid_payload",
+      "message": "payload.zone is required"
+    }
+  ]
+}

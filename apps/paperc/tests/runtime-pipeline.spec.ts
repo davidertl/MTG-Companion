@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { createInMemoryEventStore, eventsRoute } from "../../../services/api/src/index";
 import {
@@ -97,44 +98,13 @@ describe("PaperC runtime pipeline", () => {
   });
 
   it("parses PaperC producer ingest batch contract", () => {
-    const parsed = ingestBatchRequestSchema.parse({
-      idempotencyKey: "paperc-device-1-session-123-batch-42",
-      producer: {
-        app: "mancutg-paperc",
-        version: "0.1.0",
-        instanceId: "windows-device-1",
-        displayName: "David Paper Table",
-      },
-      game: {
-        gameKey: "mtg-paper",
-        gameFamily: "mtg",
-        title: "Magic: The Gathering",
-        mode: "paper",
-      },
-      session: {
-        sourceSessionId: "paper-session-123",
-        startedAt: "2026-05-07T18:00:00.000Z",
-        source: "camera",
-      },
-      events: [
-        {
-          eventId: "paper-session-123-obs-1-0",
-          sourceEventId: "paper-session-123-obs-1-0",
-          eventType: "mtg.paper.review.requested",
-          occurredAt: "2026-05-07T18:00:01.000Z",
-          seq: 100,
-          payload: {
-            candidate: "Island",
-            reason: "low_confidence",
-          },
-          confidence: 0.62,
-          provenance: {
-            source: "camera-frame",
-            frameNo: 1,
-          },
-        },
-      ],
-    });
+    const fixture = JSON.parse(
+      readFileSync(
+        "services/api/tests/fixtures/ingest-batches/paperc-minimal.json",
+        "utf8",
+      ),
+    );
+    const parsed = ingestBatchRequestSchema.parse(fixture);
 
     expect(parsed.producer.instanceId).toBe("windows-device-1");
     expect(parsed.game.mode).toBe("paper");

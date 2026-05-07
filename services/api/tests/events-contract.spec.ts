@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import {
   createInMemoryEventStore,
   eventsRoute,
 } from "../src/index";
 import {
+  ingestBatchRequestSchema,
   ingestBatchResponseSchema,
 } from "../../../packages/shared-schema/src/index";
 
@@ -382,23 +384,41 @@ describe("eventsRoute", () => {
   });
 
   it("parses v1 ingest response contract with partial errors", () => {
-    const parsed = ingestBatchResponseSchema.parse({
-      batchId: "batch_01",
-      accepted: 8,
-      duplicates: 2,
-      rejected: 1,
-      errors: [
-        {
-          eventId: "paper-session-123-obs-3-0",
-          code: "invalid_payload",
-          message: "payload.zone is required",
-        },
-      ],
-    });
+    const parsed = ingestBatchResponseSchema.parse(
+      JSON.parse(
+        readFileSync(
+          "services/api/tests/fixtures/ingest-batches/partial-error.json",
+          "utf8",
+        ),
+      ),
+    );
 
     expect(parsed.accepted).toBe(8);
     expect(parsed.duplicates).toBe(2);
     expect(parsed.rejected).toBe(1);
     expect(parsed.errors).toHaveLength(1);
+  });
+
+  it("parses ArenaC and PaperC fixture requests against shared ingest schema", () => {
+    const arenacFixture = JSON.parse(
+      readFileSync(
+        "services/api/tests/fixtures/ingest-batches/arenac-minimal.json",
+        "utf8",
+      ),
+    );
+    const papercFixture = JSON.parse(
+      readFileSync(
+        "services/api/tests/fixtures/ingest-batches/paperc-minimal.json",
+        "utf8",
+      ),
+    );
+
+    const arenaParsed = ingestBatchRequestSchema.parse(arenacFixture);
+    const paperParsed = ingestBatchRequestSchema.parse(papercFixture);
+
+    expect(arenaParsed.producer.app).toBe("mancutg-arenac");
+    expect(arenaParsed.events[0].sourceEventId).toBe("arena-log-session-abc-000001");
+    expect(paperParsed.producer.app).toBe("mancutg-paperc");
+    expect(paperParsed.events[0].sourceEventId).toBe("paper-session-123-obs-1-0");
   });
 });

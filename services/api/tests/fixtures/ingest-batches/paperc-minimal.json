@@ -1,0 +1,47 @@
+{
+  "idempotencyKey": "paperc-device-1-session-123-batch-42",
+  "producer": {
+    "app": "mancutg-paperc",
+    "version": "0.1.0",
+    "instanceId": "windows-device-1",
+    "displayName": "David Paper Table"
+  },
+  "game": {
+    "gameKey": "mtg-paper",
+    "gameFamily": "mtg",
+    "title": "Magic: The Gathering",
+    "mode": "paper"
+  },
+  "session": {
+    "sourceSessionId": "paper-session-123",
+    "startedAt": "2026-05-07T18:00:00.000Z",
+    "source": "camera"
+  },
+  "events": [
+    {
+      "eventId": "paper-session-123-obs-1-0",
+      "sourceEventId": "paper-session-123-obs-1-0",
+      "eventType": "mtg.paper.card.observed.confirmed",
+      "occurredAt": "2026-05-07T18:00:01.000Z",
+      "seq": 100,
+      "actor": {
+        "seat": "player-a"
+      },
+      "object": {
+        "type": "card",
+        "name": "Island"
+      },
+      "payload": {
+        "zone": "battlefield",
+        "cardName": "Island",
+        "confirmedBy": "user",
+        "confidence": 0.94
+      },
+      "confidence": 0.94,
+      "provenance": {
+        "source": "camera-frame",
+        "frameNo": 1
+      }
+    }
+  ]
+}

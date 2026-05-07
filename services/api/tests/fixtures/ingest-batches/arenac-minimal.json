@@ -1,0 +1,38 @@
+{
+  "idempotencyKey": "arenac-local-2026-05-07-session-abc-batch-00042",
+  "producer": {
+    "app": "mancutg-arenac",
+    "version": "0.1.0",
+    "instanceId": "local-windows-device",
+    "displayName": "ArenaC Local Windows"
+  },
+  "game": {
+    "gameKey": "mtg-arena",
+    "gameFamily": "mtg",
+    "title": "Magic: The Gathering Arena",
+    "mode": "arena"
+  },
+  "session": {
+    "sourceSessionId": "arena-log-session-abc",
+    "startedAt": "2026-05-07T18:00:00.000Z",
+    "source": "player-log"
+  },
+  "events": [
+    {
+      "eventId": "arena-log-session-abc-000001",
+      "sourceEventId": "arena-log-session-abc-000001",
+      "eventType": "mtg.arena.log.line.parsed",
+      "occurredAt": "2026-05-07T18:00:01.000Z",
+      "seq": 1,
+      "payload": {
+        "rawKind": "match_state",
+        "parsed": {}
+      },
+      "confidence": 1,
+      "provenance": {
+        "source": "player.log",
+        "lineNumber": 1234
+      }
+    }
+  ]
+}
