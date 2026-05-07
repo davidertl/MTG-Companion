@@ -58,13 +58,13 @@ describe("MancuTG-ArenaC application shell", () => {
     const html = renderArenaAppShell(state);
 
     expect(html).toContain("MancuTG-ArenaC");
-    expect(html).toContain("Start live watcher");
+    expect(html).toContain("Stop live watcher");
     expect(html).toContain("Import iOS log folder");
     expect(html).toContain("Match History");
     expect(html).toContain("Collection");
     expect(html).toContain("Inventory");
     expect(html).toContain("Diagnostics");
-    expect(html).toContain("Privacy Center");
+    expect(html).toContain("Privacy");
     expect(html).toContain("2 neue Sessions, 1 Duplikat");
   });
 });

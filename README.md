@@ -53,6 +53,7 @@ Das Repository enthaelt jetzt eine lauffaehige Grundimplementierung der Plattfor
 - **MancuTG-ArenaC-Kern**
   - `apps/desktop/src-tauri` - Offline-Bootstrap ueber Parser + Event-Store
   - `apps/desktop/src` - route-nahe Query-, Export-, Privacy-, Setup- und Deck-Cache-Logik
+  - `apps/desktop/src/app` und `apps/desktop/src/components` - React-basierte Application Shell auf Basis der vorhandenen ArenaC-Viewmodels
   - inklusive iOS/iPadOS-Offline-Importflow fuer `.log`-Dateien per Drag & Drop oder Ordnerimport
   - Live-Log-Watcher mit Checkpoints, Partial-Line-Buffering und Rotation-/Truncation-Erkennung
   - lokale Store-Summary, Import-Diagnostik, Reprocessing und Backup-Export auf Basis gespeicherter Raw Chunks

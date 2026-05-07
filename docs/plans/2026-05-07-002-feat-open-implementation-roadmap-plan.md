@@ -44,13 +44,13 @@ Ohne diese naechsten Bausteine bleibt die Architektur tragfaehig, aber fuer Endn
 - erster ArenaC-MTGA-Detailed-Log-Schritt mit Fixture-basiertem Golden-Test fuer MTGA-like JSON-Logfragmente
 - ArenaC Live-Log-Watcher mit Checkpoints, Rotation-/Truncation-Erkennung und Partial-Line-Buffering
 - ArenaC lokale Store-Summary, Import-Diagnostik, Reprocessing und Backup-Export auf Basis gespeicherter Raw Chunks
+- React-basierte MancuTG-ArenaC Application Shell mit Navigation, Setup-, Import-, History-, Collection-, Inventory-, Diagnostics-, Privacy- und Settings-Surfaces
 - Archidekt read-only Connector
 - durchgehende TS-/Rust-/Python-Testabdeckung fuer diese Foundations
 
 ### Noch nicht produktvollstaendig
 
 - noch kein umfassender produktionsreifer MTGA-Detailed-Log-Parser fuer MancuTG-ArenaC
-- keine echte Tauri-/React-Oberflaeche fuer MancuTG-ArenaC
 - keine Privacy-/Settings-/Consent-Oberflaechen fuer MancuTG-ArenaC
 - keine gehärtete Archidekt-Read-only-MVP-Produktintegration
 - kein MVP-Release-Hardening fuer MancuTG-ArenaC
@@ -264,6 +264,8 @@ Includes:
 - iOS File/Folder Import
 - Import Center
 - Dashboard / History / Collection / Inventory / Draft / Export UI
+
+**Status:** im aktuellen Branch als React-basierte Shell-/Viewmodel-Schicht umgesetzt und gruen verifiziert
 
 ### Phase 7 — ArenaC privacy, settings and consent enforcement
 

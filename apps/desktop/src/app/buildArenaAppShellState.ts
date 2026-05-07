@@ -11,7 +11,7 @@ import {
   getSetupBanner,
   getSetupChecklist,
 } from "../index";
-import type { DeckSnapshot, PrivacySettings } from "../../../../../packages/shared-schema/src/index";
+import type { DeckSnapshot, PrivacySettings } from "../../../../packages/shared-schema/src/index";
 import { createPrivacySettings } from "../lib/network/privacy";
 import type { ImportCenterSummary } from "../routes/imports/index";
 import type { MatchHistoryRecord } from "../lib/query/history";
