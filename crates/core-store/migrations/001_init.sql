@@ -21,3 +21,12 @@ CREATE TABLE IF NOT EXISTS events (
   payload_json TEXT NOT NULL,
   UNIQUE(session_id, sequence, timestamp, event_type, payload_json)
 );
+
+CREATE TABLE IF NOT EXISTS log_checkpoints (
+  log_path TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  byte_offset INTEGER NOT NULL,
+  source_fingerprint TEXT NOT NULL,
+  pending_fragment TEXT NOT NULL,
+  last_sequence INTEGER NOT NULL
+);

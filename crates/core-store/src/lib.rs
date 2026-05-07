@@ -10,6 +10,16 @@ pub struct EventStore {
     connection: Connection,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogCheckpointRecord {
+    pub log_path: String,
+    pub session_id: String,
+    pub byte_offset: u64,
+    pub source_fingerprint: String,
+    pub pending_fragment: String,
+    pub last_sequence: u64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PersistStats {
     pub inserted_raw_chunks: usize,
@@ -73,6 +83,62 @@ impl EventStore {
         self.connection
             .query_row("SELECT COUNT(*) FROM events", [], |row| row.get::<_, i64>(0))
             .map(|count| count as usize)
+    }
+
+    pub fn load_log_checkpoint(
+        &self,
+        log_path: &str,
+    ) -> rusqlite::Result<Option<LogCheckpointRecord>> {
+        let mut statement = self.connection.prepare(
+            "SELECT log_path, session_id, byte_offset, source_fingerprint, pending_fragment, last_sequence
+             FROM log_checkpoints
+             WHERE log_path = ?1",
+        )?;
+
+        let mut rows = statement.query(params![log_path])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+
+        Ok(Some(LogCheckpointRecord {
+            log_path: row.get(0)?,
+            session_id: row.get(1)?,
+            byte_offset: row.get::<_, i64>(2)? as u64,
+            source_fingerprint: row.get(3)?,
+            pending_fragment: row.get(4)?,
+            last_sequence: row.get::<_, i64>(5)? as u64,
+        }))
+    }
+
+    pub fn upsert_log_checkpoint(
+        &self,
+        checkpoint: &LogCheckpointRecord,
+    ) -> rusqlite::Result<()> {
+        self.connection.execute(
+            "INSERT INTO log_checkpoints (
+                log_path,
+                session_id,
+                byte_offset,
+                source_fingerprint,
+                pending_fragment,
+                last_sequence
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(log_path) DO UPDATE SET
+                session_id = excluded.session_id,
+                byte_offset = excluded.byte_offset,
+                source_fingerprint = excluded.source_fingerprint,
+                pending_fragment = excluded.pending_fragment,
+                last_sequence = excluded.last_sequence",
+            params![
+                checkpoint.log_path,
+                checkpoint.session_id,
+                checkpoint.byte_offset as i64,
+                checkpoint.source_fingerprint,
+                checkpoint.pending_fragment,
+                checkpoint.last_sequence as i64,
+            ],
+        )?;
+        Ok(())
     }
 
     pub fn apply_report(&self, report: &ParseReport) -> rusqlite::Result<PersistStats> {
