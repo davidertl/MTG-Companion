@@ -1,4 +1,9 @@
-import { preprocessFrame, type WebcamFrameSource } from "./capture";
+import {
+  createStickyFrameSource,
+  type WebcamFrameSource,
+  type WebcamFrameSourceFactory,
+} from "./capture";
+import { preprocessFrame } from "./capture";
 import { CardIdentifierEngine } from "./recognizer";
 import {
   papercRecognitionSnapshotSchema,
@@ -10,6 +15,7 @@ import {
 export class PapercRuntimePipeline {
   private readonly config: PapercRuntimeConfig;
   private readonly recognizer: CardIdentifierEngine;
+  private liveSourceFactory: WebcamFrameSourceFactory | null = null;
 
   constructor(config: PapercRuntimeConfig, cardPool: string[]) {
     this.config = papercRuntimeConfigSchema.parse(config);
@@ -32,5 +38,16 @@ export class PapercRuntimePipeline {
       latencyMs: Date.now() - startedAt,
     });
     return snapshot;
+  }
+
+  async runLiveTick(sourceFactory: WebcamFrameSourceFactory): Promise<PapercRecognitionSnapshot | null> {
+    if (!this.liveSourceFactory) {
+      this.liveSourceFactory = createStickyFrameSource(sourceFactory);
+    }
+    return this.runOnce(this.liveSourceFactory());
+  }
+
+  resetLiveSource(): void {
+    this.liveSourceFactory = null;
   }
 }

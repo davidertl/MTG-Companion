@@ -233,8 +233,16 @@ export function validatePapercEventContract(
 
   return {
     ...event,
-    streamId: event.streamId ?? payload.tableId,
-    matchId: event.matchId ?? payload.matchId,
+    streamId:
+      event.streamId ??
+      ("tableId" in payload && typeof payload.tableId === "string"
+        ? payload.tableId
+        : undefined),
+    matchId:
+      event.matchId ??
+      ("matchId" in payload && typeof payload.matchId === "string"
+        ? payload.matchId
+        : undefined),
     payload,
   };
 }

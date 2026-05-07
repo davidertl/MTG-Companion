@@ -4,6 +4,8 @@ export interface WebcamFrameSource {
   nextFrame(): Promise<PapercFrameInput | null>;
 }
 
+export type WebcamFrameSourceFactory = () => WebcamFrameSource;
+
 export class ScriptedWebcamFrameSource implements WebcamFrameSource {
   private index = 0;
 
@@ -17,6 +19,16 @@ export class ScriptedWebcamFrameSource implements WebcamFrameSource {
     this.index += 1;
     return papercFrameInputSchema.parse(frame);
   }
+}
+
+export function createStickyFrameSource(factory: WebcamFrameSourceFactory): WebcamFrameSourceFactory {
+  let source: WebcamFrameSource | null = null;
+  return () => {
+    if (!source) {
+      source = factory();
+    }
+    return source;
+  };
 }
 
 export function preprocessFrame(frame: PapercFrameInput): PapercFrameInput {

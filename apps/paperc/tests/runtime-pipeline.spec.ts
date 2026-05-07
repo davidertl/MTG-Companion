@@ -57,7 +57,7 @@ describe("PaperC runtime pipeline", () => {
         rawDetections: [{ zoneId: "p1-battlefield", label: "island", confidence: 0.99, count: 1 }],
       },
     ]);
-    const pipeline = new PapercRuntimePipeline(config, ["Island", "Mountain"]);
+    const pipeline = new PapercRuntimePipeline(config, ["Island", "Liliana's Triumph"]);
     const snapshot = await pipeline.runOnce(source);
     expect(snapshot).not.toBeNull();
     const batch = buildPapercEventBatchFromSnapshot(config, snapshot!);
@@ -109,5 +109,38 @@ describe("PaperC runtime pipeline", () => {
     expect(parsed.producer.instanceId).toBe("windows-device-1");
     expect(parsed.game.mode).toBe("paper");
     expect(parsed.events[0].sourceEventId).toBe("paper-session-123-obs-1-0");
+  });
+
+  it("derives deterministic occurredAt from frameTimeMs", async () => {
+    const source = new ScriptedWebcamFrameSource([
+      {
+        frameNo: 5,
+        frameTimeMs: 64000,
+        width: 1280,
+        height: 720,
+        rawDetections: [{ zoneId: "p1-battlefield", label: "island", confidence: 0.99, count: 1 }],
+      },
+    ]);
+    const pipeline = new PapercRuntimePipeline(config, ["Island"]);
+    const snapshot = await pipeline.runOnce(source);
+    const batch = buildPapercEventBatchFromSnapshot(config, snapshot!);
+    expect(batch?.events[0]?.occurredAt).toBe("2026-05-07T01:01:04.000Z");
+  });
+
+  it("preserves canonical apostrophes from the card pool", async () => {
+    const source = new ScriptedWebcamFrameSource([
+      {
+        frameNo: 3,
+        frameTimeMs: 128,
+        width: 1280,
+        height: 720,
+        rawDetections: [
+          { zoneId: "p1-battlefield", label: "liliana's triumph", confidence: 0.99, count: 1 },
+        ],
+      },
+    ]);
+    const pipeline = new PapercRuntimePipeline(config, ["Liliana's Triumph"]);
+    const snapshot = await pipeline.runOnce(source);
+    expect(snapshot?.detections[0]?.candidateName).toBe("Liliana's Triumph");
   });
 });

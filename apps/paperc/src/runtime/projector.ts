@@ -3,8 +3,13 @@ import type {
   BackendEventEnvelope,
   BackendEventSession,
 } from "../../../../packages/shared-schema/src/index";
-import { buildPapercEventBatch } from "../events/builders";
+import { buildPapercEventBatch, buildPapercObservationPayload } from "../events/builders";
 import type { PapercRecognitionSnapshot, PapercRuntimeConfig } from "./types";
+
+export function occurredAtFromFrame(sessionStartedAt: string, frameTimeMs: number): string {
+  const startedAtMs = new Date(sessionStartedAt).getTime();
+  return new Date(startedAtMs + frameTimeMs).toISOString();
+}
 
 export function buildPapercSession(config: PapercRuntimeConfig): BackendEventSession {
   return {
@@ -39,7 +44,7 @@ export function snapshotToEvents(
     sourceApp: "mancutg-paperc",
     sourceSessionId: config.sourceSessionId,
     eventType: "paperc.observation.detected",
-    occurredAt: new Date(Date.now()).toISOString(),
+    occurredAt: occurredAtFromFrame(config.startedAt, detection.frameTimeMs),
     streamId: config.streamId,
     matchId: config.tournament.matchId,
     seq: snapshot.frameNo * 100 + index,
@@ -65,10 +70,11 @@ export function snapshotToEvents(
     confidence: detection.confidence,
     reviewStatus: "none",
     supersedesEventId: null,
-    payload: {
+    payload: buildPapercObservationPayload({
       ...config.tournament,
       captureSessionId: config.captureSessionId,
       cameraId: config.video.cameraId,
+      videoSourceId: config.video.sourceId,
       observationKind: "board-state",
       frameRef: {
         frameNo: detection.frameNo,
@@ -78,7 +84,7 @@ export function snapshotToEvents(
       details: {
         zoneId: detection.zoneId,
       },
-    },
+    }),
   }));
 }
 

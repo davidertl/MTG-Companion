@@ -9,13 +9,6 @@ function normalizeLabel(label: string): string {
   return label.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function titleCase(label: string): string {
-  return label
-    .split(" ")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 export class CardIdentifierEngine {
   private readonly knownCards: Map<string, string>;
   private readonly config: PapercRuntimeConfig;
@@ -23,7 +16,7 @@ export class CardIdentifierEngine {
   constructor(config: PapercRuntimeConfig, cardPool: string[]) {
     this.config = papercRuntimeConfigSchema.parse(config);
     this.knownCards = new Map(
-      cardPool.map((cardName) => [normalizeLabel(cardName), titleCase(cardName)]),
+      cardPool.map((cardName) => [normalizeLabel(cardName), cardName]),
     );
   }
 

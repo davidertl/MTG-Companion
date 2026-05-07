@@ -4,6 +4,7 @@ import {
   backendEventBatchEnvelopeSchema,
   backendEventEnvelopeSchema,
   mediaIngestRequestSchema,
+  papercObservationPayloadSchema,
   type BackendEventBatchEnvelope,
   type BackendEventEnvelope,
   type MediaCaptureSession,
@@ -45,7 +46,7 @@ export function buildPapercMediaRequest(
 }
 
 export function buildPapercObservationPayload(
-  input: PapercObservationPayload,
+  input: unknown,
 ): PapercObservationPayload {
-  return input;
+  return papercObservationPayloadSchema.parse(input);
 }
