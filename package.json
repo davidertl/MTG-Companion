@@ -5,10 +5,10 @@
   "scripts": {
     "api:start": "node --experimental-strip-types services/api/src/main.ts",
     "api:smoke": "node --experimental-strip-types services/api/src/smoke.ts",
-    "arenac:build": "cargo build -p mancutg-arenac",
+    "arenac:build": "cargo build -p mancutg-arenac --bin mancutg-arenac-cli",
     "arenac:smoke": "bash scripts/arenac_smoke.sh",
-    "arenac:dev": "cd apps/desktop && npm install && tauri dev",
-    "arenac:bundle": "cd apps/desktop && npm install && tauri build",
+    "arenac:dev": "cd apps/desktop && npm install && tauri dev -- -- --features gui",
+    "arenac:bundle": "cd apps/desktop && npm install && tauri build -- --features gui",
     "desktop:help": "cargo run -p mancutg-arenac --bin mancutg-arenac-cli -- --help",
     "typecheck": "tsc --noEmit",
     "test:ts": "vitest run",

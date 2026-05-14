@@ -1,3 +1,4 @@
+#[cfg(feature = "gui")]
 pub mod commands;
 
 use core_domain::{

@@ -19,8 +19,11 @@ core-domain = { path = "../../../crates/core-domain" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sha2 = "0.10.9"
-tauri = { version = "2", features = [] }
-tauri-plugin-dialog = "2"
+tauri = { version = "2", features = [], optional = true }
+tauri-plugin-dialog = { version = "2", optional = true }
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2", features = [], optional = true }
+
+[features]
+gui = ["dep:tauri", "dep:tauri-plugin-dialog", "dep:tauri-build"]
