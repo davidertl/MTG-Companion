@@ -19,5 +19,5 @@
     "services/**/*.ts",
     "services/**/*.py"
   ],
-  "exclude": ["node_modules", "target"]
+  "exclude": ["node_modules", "target", "**/vite.config.ts", "**/dist"]
 }

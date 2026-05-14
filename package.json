@@ -7,7 +7,9 @@
     "api:smoke": "node --experimental-strip-types services/api/src/smoke.ts",
     "arenac:build": "cargo build -p mancutg-arenac",
     "arenac:smoke": "bash scripts/arenac_smoke.sh",
-    "desktop:help": "cargo run -p mancutg-arenac -- --help",
+    "arenac:dev": "cd apps/desktop && npm install && tauri dev",
+    "arenac:bundle": "cd apps/desktop && npm install && tauri build",
+    "desktop:help": "cargo run -p mancutg-arenac --bin mancutg-arenac-cli -- --help",
     "typecheck": "tsc --noEmit",
     "test:ts": "vitest run",
     "test:rust": "cargo test --workspace",
@@ -15,11 +17,14 @@
     "test": "npm run typecheck && npm run test:ts && npm run test:rust && npm run test:python"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

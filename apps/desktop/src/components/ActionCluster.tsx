@@ -1,5 +1,6 @@
 export function ActionCluster(props: {
   labels: string[];
+  onClick?: (label: string) => void;
 }) {
   return (
     <div
@@ -13,6 +14,7 @@ export function ActionCluster(props: {
         <button
           key={label}
           type="button"
+          onClick={() => props.onClick?.(label)}
           style={{
             border: "1px solid #35507a",
             borderRadius: 999,

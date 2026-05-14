@@ -1,3 +1,5 @@
+pub mod commands;
+
 use core_domain::{
     CollectionSnapshot, DraftPick, EventType, ImportSourceKind, InventorySnapshot, LogSession,
     MatchRecord, PlatformTag,
@@ -299,6 +301,16 @@ pub fn import_ios_logs(
             roots,
         },
     )
+}
+
+pub fn import_ios_file_at_path(log_path: &str) -> Result<OfflineLogImportSummary, String> {
+    let store = open_store(None)?;
+    import_ios_logs(&store, ImportSourceKind::DragAndDrop, vec![PathBuf::from(log_path)])
+}
+
+pub fn import_ios_folder_at_path(directory: &str) -> Result<OfflineLogImportSummary, String> {
+    let store = open_store(None)?;
+    import_ios_logs(&store, ImportSourceKind::FolderImport, vec![PathBuf::from(directory)])
 }
 
 pub fn inspect_local_store(optional_store_path: Option<&str>) -> Result<LocalStoreSummary, String> {

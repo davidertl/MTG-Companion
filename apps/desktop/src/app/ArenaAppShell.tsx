@@ -5,8 +5,9 @@ import type { ArenaAppShellState } from "./buildArenaAppShellState";
 
 export function ArenaAppShell(props: {
   state: ArenaAppShellState;
+  onAction?: (label: string) => void;
 }) {
-  const { state } = props;
+  const { state, onAction } = props;
 
   return (
     <main
@@ -83,6 +84,7 @@ export function ArenaAppShell(props: {
                 state.actions.exportBackupLabel,
                 state.actions.refreshLabel,
               ]}
+              onClick={onAction}
             />
           </section>
 

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-HELP_OUTPUT="$(cargo run -p mancutg-arenac -- --help)"
+HELP_OUTPUT="$(cargo run -p mancutg-arenac --bin mancutg-arenac-cli -- --help)"
 if [[ "$HELP_OUTPUT" != *"watch-log"* ]] || [[ "$HELP_OUTPUT" != *"export-backup"* ]]; then
   echo "ArenaC help output missing expected commands"
   exit 1
@@ -24,9 +24,9 @@ cat > "$LOG_PATH" <<'EOF'
 2026-05-07T04:01:00Z|COLLECTION_SNAPSHOT|cards_owned=777
 EOF
 
-BOOTSTRAP_OUTPUT="$(cargo run -p mancutg-arenac -- bootstrap "$LOG_PATH")"
-WATCH_OUTPUT="$(cargo run -p mancutg-arenac -- watch-log "$LOG_PATH" "$STORE_PATH")"
-SETTINGS_OUTPUT="$(cargo run -p mancutg-arenac -- show-settings "$SETTINGS_PATH")"
+BOOTSTRAP_OUTPUT="$(cargo run -p mancutg-arenac --bin mancutg-arenac-cli -- bootstrap "$LOG_PATH")"
+WATCH_OUTPUT="$(cargo run -p mancutg-arenac --bin mancutg-arenac-cli -- watch-log "$LOG_PATH" "$STORE_PATH")"
+SETTINGS_OUTPUT="$(cargo run -p mancutg-arenac --bin mancutg-arenac-cli -- show-settings "$SETTINGS_PATH")"
 
 python3 - "$BOOTSTRAP_OUTPUT" "$WATCH_OUTPUT" "$SETTINGS_OUTPUT" <<'PY'
 import json
