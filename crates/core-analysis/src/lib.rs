@@ -32,6 +32,7 @@ use core_gamestate::{GameTimeline, TimelineAction, TurnSnapshot};
 use serde::{Deserialize, Serialize};
 
 mod checks;
+mod suggest;
 
 /// Version stamp written onto every [`Finding::engine_version`]. Bump when a
 /// check's semantics change so downstream consumers can tell engines apart.
@@ -131,6 +132,40 @@ impl CheckContext<'_> {
             engine_version: ENGINE_VERSION.to_owned(),
         }
     }
+
+    /// Builds a suggestion [`Finding`] (W3.2). Suggestions are always
+    /// [`FindingKind::Suggestion`] at [`Severity::Info`] and inherit the mode
+    /// default audience [`Audience::Players`]; `finding_id` is assigned
+    /// centrally afterwards, exactly as for rule-checks, so both kinds are
+    /// numbered and returned together.
+    pub(crate) fn suggestion(
+        &self,
+        code: &str,
+        turn_number: u32,
+        phase: String,
+        confidence: f64,
+        rule_refs: &[&str],
+        description: String,
+    ) -> Finding {
+        Finding {
+            finding_id: String::new(),
+            game_key: self.game_key.to_owned(),
+            turn_number,
+            phase: if phase.is_empty() {
+                "unknown".to_owned()
+            } else {
+                phase
+            },
+            kind: FindingKind::Suggestion,
+            code: code.to_owned(),
+            severity: Severity::Info,
+            confidence,
+            rule_refs: rule_refs.iter().map(|reference| (*reference).to_owned()).collect(),
+            description,
+            audience: Audience::Players,
+            engine_version: ENGINE_VERSION.to_owned(),
+        }
+    }
 }
 
 /// Analyze a timeline with the default game key. Pure; see [`analyze_with_game_key`].
@@ -162,6 +197,12 @@ pub fn analyze_with_game_key(
     findings.extend(checks::mana_impossible::check(&ctx));
     findings.extend(checks::illegal_attack::check(&ctx));
     findings.extend(checks::missed_trigger_hint::check(&ctx));
+
+    // Suggestions (W3.2) ride along in the same output as rule-checks.
+    findings.extend(suggest::lethal_available::check(&ctx));
+    findings.extend(suggest::unused_mana_with_play::check(&ctx));
+    findings.extend(suggest::missed_land_drop::check(&ctx));
+    findings.extend(suggest::no_block_lethal_taken::check(&ctx));
 
     for (index, finding) in findings.iter_mut().enumerate() {
         finding.finding_id = format!(
