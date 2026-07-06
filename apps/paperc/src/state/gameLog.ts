@@ -16,6 +16,7 @@
 
 import type {
   BackendEventBatchEnvelope,
+  FindingVisibilityMode,
   GameAction,
   TournamentContext,
 } from "../../../../packages/shared-schema/src/index";
@@ -195,6 +196,13 @@ export type PaperGameSetup = {
   format: string;
   players: { player1: string; player2: string };
   tournament: TournamentContext;
+  /**
+   * Visibility mode of the bound tournament. When `referee-only`, the logging
+   * UI suppresses all local findings (client-side second layer to the backend's
+   * enforcement — see src/state/findingSuppression.ts). Undefined for casual
+   * local games and treated as `players`.
+   */
+  findingVisibilityMode?: FindingVisibilityMode;
 };
 
 export function observationKindForAction(action: GameAction): PapercObservationKind {

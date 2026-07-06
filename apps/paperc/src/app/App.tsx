@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { GameAction, TournamentContext } from "../../../../packages/shared-schema/src/index";
+import type {
+  AnalysisFinding,
+  FindingVisibilityMode,
+  GameAction,
+  TournamentContext,
+} from "../../../../packages/shared-schema/src/index";
 import {
   buildGameEventBatch,
   createGameLogState,
@@ -33,9 +38,30 @@ import {
   loadJson,
   saveJson,
 } from "../state/persistence";
+import { buildLocalFindingsView } from "../state/findingSuppression";
 import { Outbox, browserFetch } from "../sync/outbox";
-import { Panel, PillButton, TextField, theme } from "./components";
+import { Panel, PillButton, TextField, Toggle, theme } from "./components";
 import { CardNameInput } from "./CardNameInput";
+import { RefereeView } from "./RefereeView";
+
+type AppMode = "log" | "referee";
+
+function ModeSwitch(props: { mode: AppMode; onChange: (mode: AppMode) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      <PillButton
+        label="Log a game"
+        variant={props.mode === "log" ? "accent" : "default"}
+        onClick={() => props.onChange("log")}
+      />
+      <PillButton
+        label="Referee view"
+        variant={props.mode === "referee" ? "accent" : "default"}
+        onClick={() => props.onChange("referee")}
+      />
+    </div>
+  );
+}
 
 const store = getDefaultStore();
 
@@ -65,6 +91,7 @@ type SetupForm = {
   tournamentId: string;
   roundId: string;
   tableId: string;
+  refereeOnly: boolean;
 };
 
 const DEFAULT_SETUP_FORM: SetupForm = {
@@ -74,6 +101,7 @@ const DEFAULT_SETUP_FORM: SetupForm = {
   tournamentId: "",
   roundId: "",
   tableId: "",
+  refereeOnly: false,
 };
 
 function buildSetup(form: SetupForm): PaperGameSetup {
@@ -90,6 +118,13 @@ function buildSetup(form: SetupForm): PaperGameSetup {
         gameKey: "mtg-paper",
       }
     : localTournamentContext(matchId, tableId);
+  // Referee-only routing only applies to a real bound tournament; a casual local
+  // game leaves it undefined (treated as `players`).
+  const findingVisibilityMode: FindingVisibilityMode | undefined = useTournament
+    ? form.refereeOnly
+      ? "referee-only"
+      : "players"
+    : undefined;
   return {
     sourceSessionId: sessionId,
     captureSessionId: newId("capture"),
@@ -100,10 +135,12 @@ function buildSetup(form: SetupForm): PaperGameSetup {
     format: form.format.trim() || "casual",
     players: { player1: form.player1.trim() || "Player 1", player2: form.player2.trim() || "Player 2" },
     tournament,
+    findingVisibilityMode,
   };
 }
 
 export function App() {
+  const [appMode, setAppMode] = useState<AppMode>("log");
   const [setup, setSetup] = useState<PaperGameSetup | null>(() =>
     loadJson<PaperGameSetup>(store, SETUP_STORAGE_KEY),
   );
@@ -294,10 +331,25 @@ export function App() {
     margin: "0 auto",
   } as const;
 
+  if (appMode === "referee") {
+    return (
+      <div style={pageStyle}>
+        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <h1 style={{ margin: 0, fontSize: 22 }}>MancuTG-PaperC</h1>
+          <ModeSwitch mode={appMode} onChange={setAppMode} />
+        </header>
+        <RefereeView />
+      </div>
+    );
+  }
+
   if (!setup) {
     return (
       <div style={pageStyle}>
-        <h1 style={{ margin: 0, fontSize: 24 }}>MancuTG-PaperC</h1>
+        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <h1 style={{ margin: 0, fontSize: 24 }}>MancuTG-PaperC</h1>
+          <ModeSwitch mode={appMode} onChange={setAppMode} />
+        </header>
         <Panel title="New game" subtitle="Log a physical match move-by-move.">
           <TextField label="Player 1" value={form.player1} onChange={(v) => setForm({ ...form, player1: v })} />
           <TextField label="Player 2" value={form.player2} onChange={(v) => setForm({ ...form, player2: v })} />
@@ -310,6 +362,14 @@ export function App() {
           />
           <TextField label="Round (optional)" value={form.roundId} onChange={(v) => setForm({ ...form, roundId: v })} />
           <TextField label="Table (optional)" value={form.tableId} onChange={(v) => setForm({ ...form, tableId: v })} />
+          {form.tournamentId.trim().length > 0 ? (
+            <Toggle
+              label="Referee-only analysis"
+              hint="Findings route to the referee; this device shows none."
+              checked={form.refereeOnly}
+              onChange={(checked) => setForm({ ...form, refereeOnly: checked })}
+            />
+          ) : null}
           <PillButton label="Start game" variant="accent" onClick={startGame} />
         </Panel>
         <p style={{ color: theme.textDim, fontSize: 12, margin: 0 }}>
@@ -319,11 +379,21 @@ export function App() {
     );
   }
 
+  // PaperC does not compute findings locally yet; when a synced tournament in
+  // referee-only mode later surfaces findings here, this view guarantees the
+  // player device shows none (cosmetic layer over the backend's enforcement).
+  const localFindings: AnalysisFinding[] = [];
+  const findingsView = buildLocalFindingsView(localFindings, setup.findingVisibilityMode);
+  const boundToTournament = setup.tournament.tournamentId !== "local";
+
   return (
     <div style={pageStyle}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>MancuTG-PaperC</h1>
-        <PillButton label="End & new game" variant="danger" onClick={() => setSetup(null)} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <ModeSwitch mode={appMode} onChange={setAppMode} />
+          <PillButton label="End & new game" variant="danger" onClick={() => setSetup(null)} />
+        </div>
       </header>
 
       <Panel
@@ -386,6 +456,42 @@ export function App() {
           ))}
         </div>
       </Panel>
+
+      {boundToTournament ? (
+        <Panel
+          title="Analysis"
+          subtitle={findingsView.refereeOnly ? "Referee-only tournament." : "Findings for this game."}
+        >
+          {findingsView.refereeOnly ? (
+            <p
+              role="status"
+              style={{
+                margin: 0,
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: `1px solid ${theme.panelBorder}`,
+                background: "#0e1521",
+                color: theme.textDim,
+                fontSize: 13,
+              }}
+            >
+              {findingsView.notice}
+            </p>
+          ) : findingsView.findings.length === 0 ? (
+            <p style={{ color: theme.textDim, fontSize: 13, margin: 0 }}>
+              No findings for this game yet.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
+              {findingsView.findings.map((finding) => (
+                <li key={finding.findingId} style={{ fontSize: 13 }}>
+                  T{finding.turnNumber} · {finding.severity} · {finding.description}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      ) : null}
 
       <Panel title="Sync" subtitle="Offline queue; flush posts batches to the backend.">
         <TextField label="Backend endpoint" value={endpoint} onChange={setEndpoint} />

@@ -88,3 +88,4 @@ export function saveJson(store: KeyValueStore, key: string, value: unknown): voi
 export const GAME_LOG_STORAGE_KEY = "mancutg.paperc.gameLog.v1";
 export const SETUP_STORAGE_KEY = "mancutg.paperc.setup.v1";
 export const OUTBOX_STORAGE_KEY = "mancutg.paperc.outbox.v1";
+export const REFEREE_SESSION_STORAGE_KEY = "mancutg.paperc.referee.v1";

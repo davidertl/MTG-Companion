@@ -87,6 +87,62 @@ export function PillButton(props: {
   );
 }
 
+export function Toggle(props: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint?: string;
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        color: theme.textDim,
+        fontSize: 13,
+        cursor: "pointer",
+      }}
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={props.checked}
+        aria-label={props.label}
+        onClick={() => props.onChange(!props.checked)}
+        style={{
+          width: 44,
+          height: 24,
+          flexShrink: 0,
+          borderRadius: 999,
+          border: `1px solid ${props.checked ? "#35507a" : theme.panelBorder}`,
+          background: props.checked ? theme.accent : "#0e1521",
+          position: "relative",
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: props.checked ? 22 : 2,
+            width: 18,
+            height: 18,
+            borderRadius: 999,
+            background: theme.text,
+            transition: "left 120ms ease",
+          }}
+        />
+      </button>
+      <span style={{ display: "grid", gap: 2 }}>
+        <span style={{ color: theme.text }}>{props.label}</span>
+        {props.hint ? <span>{props.hint}</span> : null}
+      </span>
+    </label>
+  );
+}
+
 export function TextField(props: {
   label: string;
   value: string;
