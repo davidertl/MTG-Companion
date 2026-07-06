@@ -308,7 +308,7 @@ impl EventStore {
                     sequence: row.get::<_, i64>(1)? as u64,
                     timestamp: row.get(2)?,
                     event_type: EventType::from_label(&row.get::<_, String>(3)?),
-                    payload: serde_json::from_str(&payload_json).expect("payload should parse"),
+                    payload: parse_payload_json(&payload_json),
                 })
             })?;
 
@@ -419,4 +419,17 @@ impl EventStore {
     fn migrate(&self) -> rusqlite::Result<()> {
         self.connection.execute_batch(include_str!("../migrations/001_init.sql"))
     }
+}
+
+/// Migration-on-read for the `payload_json` column.
+///
+/// New rows store arbitrary structured JSON (`serde_json::Value`). Legacy rows
+/// stored a flat JSON object of strings (the old `BTreeMap<String, String>`
+/// payload) — that is valid JSON and loads through the same parse. Rows whose
+/// payload is not valid JSON (never produced by this crate, but tolerated
+/// defensively) are carried verbatim as a JSON string instead of failing the
+/// whole load.
+fn parse_payload_json(payload_json: &str) -> serde_json::Value {
+    serde_json::from_str(payload_json)
+        .unwrap_or_else(|_| serde_json::Value::String(payload_json.to_owned()))
 }

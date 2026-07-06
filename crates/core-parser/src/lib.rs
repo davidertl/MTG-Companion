@@ -1,4 +1,4 @@
-use core_domain::{EventType, NormalizedEvent, ParseReport, RawChunk};
+use core_domain::{flat_payload, EventType, NormalizedEvent, ParseReport, RawChunk};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -116,7 +116,7 @@ fn parse_line(session_id: &str, sequence: u64, line: &str) -> Result<NormalizedE
         sequence,
         timestamp,
         event_type: EventType::from_label(label),
-        payload,
+        payload: flat_payload(payload),
     })
 }
 
@@ -195,7 +195,7 @@ fn parse_mtga_json_line(
         sequence,
         timestamp,
         event_type,
-        payload,
+        payload: flat_payload(payload),
     })
 }
 
