@@ -10,3 +10,4 @@ npm test
 npm run api:smoke
 npm run arenac:build
 npm run arenac:smoke
+npm run paperc:build
