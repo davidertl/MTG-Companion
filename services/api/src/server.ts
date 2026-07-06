@@ -2,7 +2,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { URL } from "node:url";
 import { ZodError } from "zod";
 
-import { createInMemoryEventStore, type EventStore } from "./domain/eventService.ts";
+import {
+  createInMemoryEventStore,
+  type BackendStoreLike,
+} from "./domain/eventService.ts";
 import { createInMemorySyncStore, type SyncStore } from "./domain/syncService.ts";
 import { mediaSessionsRoute } from "./routes/media/index.ts";
 import {
@@ -12,11 +15,12 @@ import {
   type ArchidektFetcher,
 } from "./routes/integrations/archidekt/import.ts";
 import { eventsRoute } from "./routes/events.ts";
+import { eventsPullRoute } from "./routes/eventsPull.ts";
 import { syncRoute } from "./routes/sync.ts";
 
 export interface ApiServerOptions {
   store?: SyncStore;
-  eventStore?: EventStore;
+  eventStore?: BackendStoreLike;
   archidektFetcher?: ArchidektFetcher;
 }
 
@@ -50,6 +54,18 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
           ? authorization.slice("Bearer ".length)
           : undefined;
         const result = syncRoute(body, token, store);
+        return sendJson(response, 200, result);
+      }
+
+      if (method === "GET" && url.pathname === "/events") {
+        const result = eventsPullRoute(
+          {
+            cursor: url.searchParams.get("cursor") ?? undefined,
+            limit: url.searchParams.get("limit") ?? undefined,
+            tournamentId: url.searchParams.get("tournamentId") ?? undefined,
+          },
+          eventStore,
+        );
         return sendJson(response, 200, result);
       }
 
