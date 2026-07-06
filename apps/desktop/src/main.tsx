@@ -1,6 +1,6 @@
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { ArenaAppShell } from "./app/ArenaAppShell";
 import { buildArenaAppShellState } from "./app/buildArenaAppShellState";
 import type { ArenaAppShellInput } from "./app/buildArenaAppShellState";
@@ -10,19 +10,32 @@ import type { InventorySummary } from "./routes/inventory/index";
 import type { DraftPickView } from "./routes/draft/index";
 import type { ImportDiagnosticView } from "./routes/diagnostics/index";
 import {
+  buildMatchDetailState,
+  type MatchDetailState,
+} from "./routes/history/index";
+import { saveBackupBundle } from "./lib/export/index";
+import {
   tauriInspectStore,
   tauriShowSettings,
+  tauriSetConsent,
   tauriWatchLog,
   tauriImportIosFile,
   tauriImportIosFolder,
   tauriExportBackup,
+  tauriInspectMatch,
+  tauriWriteExportFile,
+  tauriStartWatcher,
+  tauriStopWatcher,
+  tauriWatcherStatus,
   type RustLocalStoreSummary,
   type RustArenaSettings,
+  type RustWatcherStatus,
 } from "./lib/tauri/commands";
 
 function mapStoreToInput(
   store: RustLocalStoreSummary,
   settings: RustArenaSettings,
+  watcher: RustWatcherStatus | null,
 ): ArenaAppShellInput {
   const matches: MatchHistoryRecord[] = store.matchHistory.map((m) => ({
     matchId: m.match_id,
@@ -64,6 +77,8 @@ function mapStoreToInput(
 
   return {
     hasDetailedLogs: store.sessions.length > 0,
+    logPath: watcher?.logPath ?? watcher?.defaultLogPath ?? undefined,
+    watcherRunning: watcher?.running ?? false,
     privacy: {
       telemetryEnabled: settings.privacy.telemetryEnabled,
       syncEnabled: settings.privacy.syncEnabled,
@@ -87,24 +102,73 @@ function App() {
   const [input, setInput] = useState<ArenaAppShellInput>({
     hasDetailedLogs: false,
   });
+  const [watcher, setWatcher] = useState<RustWatcherStatus | null>(null);
+  const [activeView, setActiveView] = useState<string>("Imports");
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [matchDetail, setMatchDetail] = useState<MatchDetailState | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [store, settings] = await Promise.all([
+    const [store, settings, status] = await Promise.all([
       tauriInspectStore(),
       tauriShowSettings(),
+      tauriWatcherStatus().catch(() => null),
     ]);
-    setInput(mapStoreToInput(store, settings));
+    setWatcher(status);
+    setInput(mapStoreToInput(store, settings, status));
   }, []);
 
   useEffect(() => {
     refresh()
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : String(err)),
-      )
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, [refresh]);
+
+  // Poll the live watcher status so the UI reflects real watcher state
+  // (replacing the previously hardcoded `watcherRunning = false`).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      tauriWatcherStatus()
+        .then((status) => {
+          setWatcher(status);
+          setInput((prev) => ({ ...prev, watcherRunning: status.running }));
+        })
+        .catch(() => {
+          /* watcher status is best-effort; ignore transient failures */
+        });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSelectMatch = useCallback(async (matchId: string) => {
+    setSelectedMatchId(matchId);
+    setDetailLoading(true);
+    try {
+      const inspection = await tauriInspectMatch(matchId);
+      setMatchDetail(buildMatchDetailState(inspection.matchId, inspection.events));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setMatchDetail(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  const handleToggleConsent = useCallback(
+    async (purpose: string, enabled: boolean) => {
+      try {
+        await tauriSetConsent(purpose, enabled);
+        await refresh();
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [refresh],
+  );
 
   const handleAction = useCallback(
     async (label: string) => {
@@ -125,10 +189,7 @@ function App() {
             await tauriImportIosFolder(selected);
             await refresh();
           }
-        } else if (
-          label === "Import desktop log" ||
-          label === "Start live watcher"
-        ) {
+        } else if (label === "Import desktop log") {
           const selected = await open({
             filters: [{ name: "Log", extensions: ["log", "txt"] }],
           });
@@ -136,15 +197,43 @@ function App() {
             await tauriWatchLog(selected);
             await refresh();
           }
+        } else if (label === "Start live watcher") {
+          // Prefer the OS default Arena log path; fall back to a picked file
+          // when no default is known (e.g. Linux dev hosts).
+          let logPath = watcher?.defaultLogPath ?? undefined;
+          if (!logPath) {
+            const selected = await open({
+              filters: [{ name: "Log", extensions: ["log", "txt"] }],
+            });
+            logPath = selected && typeof selected === "string" ? selected : undefined;
+            if (!logPath) {
+              return;
+            }
+          }
+          const status = await tauriStartWatcher(logPath);
+          setWatcher(status);
+          await refresh();
+        } else if (label === "Stop live watcher") {
+          const status = await tauriStopWatcher();
+          setWatcher(status);
+          await refresh();
         } else if (label === "Export backup bundle") {
-          await tauriExportBackup();
+          const bundle = await tauriExportBackup();
+          await saveBackupBundle(bundle, {
+            pickPath: (defaultName) =>
+              save({
+                defaultPath: defaultName,
+                filters: [{ name: "JSON", extensions: ["json"] }],
+              }),
+            writeFile: tauriWriteExportFile,
+          });
         }
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [refresh],
+    [refresh, watcher],
   );
 
   if (loading) {
@@ -192,7 +281,19 @@ function App() {
           {error}
         </div>
       )}
-      <ArenaAppShell state={state} onAction={handleAction} />
+      <ArenaAppShell
+        state={state}
+        activeView={activeView}
+        onSelectView={setActiveView}
+        onAction={handleAction}
+        onToggleConsent={handleToggleConsent}
+        history={{
+          selectedMatchId,
+          onSelectMatch: handleSelectMatch,
+          detail: matchDetail,
+          detailLoading,
+        }}
+      />
     </>
   );
 }

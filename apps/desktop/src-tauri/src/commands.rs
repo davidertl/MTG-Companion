@@ -1,6 +1,6 @@
 use crate::{
     ArenaSettings, BackupBundle, DesktopBootstrap, LiveLogWatchSummary, LiveWatcherHandle,
-    LocalStoreSummary, OfflineLogImportSummary, WatcherStatus,
+    LocalStoreSummary, MatchInspection, OfflineLogImportSummary, WatcherStatus,
 };
 use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
@@ -51,6 +51,22 @@ pub fn import_ios_folder(directory: String) -> Result<OfflineLogImportSummary, S
 #[tauri::command]
 pub fn export_backup() -> Result<BackupBundle, String> {
     crate::export_backup_bundle(None)
+}
+
+/// Returns every stored event belonging to `match_id`, in stored order, for
+/// the desktop match-detail timeline (read-only projection over the event
+/// store; append-only invariant untouched).
+#[tauri::command]
+pub fn inspect_match(match_id: String) -> Result<MatchInspection, String> {
+    crate::inspect_match(&match_id, None)
+}
+
+/// Writes already-serialized export contents to a user-chosen path (obtained
+/// via the native save dialog on the frontend). Offline-only: writes a local
+/// file, no network involvement.
+#[tauri::command]
+pub fn write_export_file(path: String, contents: String) -> Result<String, String> {
+    crate::write_export_file(&path, &contents)
 }
 
 /// Starts the continuous live watcher over the given Arena log path (or the

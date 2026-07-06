@@ -1,5 +1,6 @@
 use mancutg_arenac::{
-    export_backup_bundle, inspect_local_store, reprocess_session, watch_live_log_once,
+    export_backup_bundle, inspect_local_store, inspect_match, reprocess_session,
+    watch_live_log_once,
 };
 use std::{
     fs,
@@ -39,6 +40,41 @@ fn inspects_local_store_and_surfaces_sessions_diagnostics_and_unknown_events() {
     assert_eq!(summary.unknown_events.len(), 1);
     assert!(!summary.diagnostics.is_empty());
     assert_eq!(summary.checkpoints.len(), 1);
+
+    fs::remove_file(log_path).expect("temporary log should be removable");
+    fs::remove_file(store_path).expect("temporary store should be removable");
+}
+
+#[test]
+fn inspect_match_returns_only_events_for_the_requested_match() {
+    let log_path = temp_path("inspect-match-log", "log");
+    let store_path = temp_path("inspect-match-store", "sqlite3");
+
+    fs::write(
+        &log_path,
+        "\
+2026-05-07T04:00:00Z|MATCH_START|match_id=match-1|deck=Azorius|queue=ranked
+2026-05-07T04:01:00Z|MATCH_END|match_id=match-1|result=win
+2026-05-07T04:02:00Z|MATCH_START|match_id=match-2|deck=Rakdos|queue=play
+",
+    )
+    .expect("log should be written");
+
+    watch_live_log_once(&log_path, Some(store_path.to_string_lossy().as_ref()))
+        .expect("watch should succeed");
+
+    let inspection = inspect_match("match-1", Some(store_path.to_string_lossy().as_ref()))
+        .expect("match inspection should succeed");
+
+    assert_eq!(inspection.match_id, "match-1");
+    assert_eq!(inspection.events.len(), 2);
+    assert_eq!(inspection.events[0].event_type, "MATCH_START");
+    assert_eq!(inspection.events[1].event_type, "MATCH_END");
+    assert!(inspection.events[0].payload_json.contains("match-1"));
+
+    let empty = inspect_match("does-not-exist", Some(store_path.to_string_lossy().as_ref()))
+        .expect("missing match inspection should succeed");
+    assert!(empty.events.is_empty());
 
     fs::remove_file(log_path).expect("temporary log should be removable");
     fs::remove_file(store_path).expect("temporary store should be removable");

@@ -238,6 +238,30 @@ pub struct LocalStoreSummary {
     pub checkpoints: Vec<LogCheckpointRecord>,
 }
 
+/// A single normalized event belonging to one match, as surfaced to the
+/// desktop match-detail timeline. The structured payload is re-serialized to a
+/// JSON string so the UI can render nested gameplay payloads without a second
+/// Rust-side type per event shape.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchEventSummary {
+    pub session_id: String,
+    pub sequence: u64,
+    pub timestamp: String,
+    pub event_type: String,
+    pub payload_json: String,
+}
+
+/// Read model backing the `inspect_match` command: every stored event whose
+/// payload carries the requested `match_id`, in stored order. Follows the same
+/// `match_id`-in-payload convention as [`core_store::EventStore::load_match_history`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchInspection {
+    pub match_id: String,
+    pub events: Vec<MatchEventSummary>,
+}
+
 fn default_store_path() -> Result<PathBuf, String> {
     env::current_dir()
         .map(|cwd| cwd.join("mancutg-arenac.sqlite3"))
@@ -450,6 +474,28 @@ pub fn import_ios_folder_at_path(directory: &str) -> Result<OfflineLogImportSumm
 pub fn inspect_local_store(optional_store_path: Option<&str>) -> Result<LocalStoreSummary, String> {
     let store = open_store(optional_store_path)?;
     build_local_store_summary(&store)
+}
+
+/// Returns every stored event whose payload carries the given `match_id`, in
+/// stored (`rowid`) order, backing the desktop match-detail timeline. Uses the
+/// same `match_id`-in-payload grouping convention as
+/// [`core_store::EventStore::load_match_history`], so the events surfaced here
+/// are exactly those the match list summarizes.
+pub fn inspect_match(
+    match_id: &str,
+    optional_store_path: Option<&str>,
+) -> Result<MatchInspection, String> {
+    let store = open_store(optional_store_path)?;
+    build_match_inspection(&store, match_id)
+}
+
+/// Writes `contents` verbatim to `path`. Used by the desktop export flow after
+/// the user has picked a destination via the native save dialog; the write
+/// target is therefore an explicit, user-chosen path. Returns the written path.
+pub fn write_export_file(path: &str, contents: &str) -> Result<String, String> {
+    fs::write(path, contents)
+        .map_err(|error| format!("failed to write export file {path}: {error}"))?;
+    Ok(path.to_owned())
 }
 
 pub fn reprocess_session(
@@ -1115,6 +1161,36 @@ fn build_local_store_summary(store: &EventStore) -> Result<LocalStoreSummary, St
         checkpoints: store
             .load_all_log_checkpoints()
             .map_err(|error| format!("failed to load checkpoints: {error}"))?,
+    })
+}
+
+fn build_match_inspection(
+    store: &EventStore,
+    match_id: &str,
+) -> Result<MatchInspection, String> {
+    let events = store
+        .load_events()
+        .map_err(|error| format!("failed to load events: {error}"))?;
+
+    let mut match_events = Vec::new();
+    for event in events {
+        if core_domain::payload_value(&event.payload, "match_id").as_deref() != Some(match_id) {
+            continue;
+        }
+        let payload_json = serde_json::to_string(&event.payload)
+            .unwrap_or_else(|_| "{}".to_owned());
+        match_events.push(MatchEventSummary {
+            session_id: event.session_id,
+            sequence: event.sequence,
+            timestamp: event.timestamp,
+            event_type: event.event_type.label().to_owned(),
+            payload_json,
+        });
+    }
+
+    Ok(MatchInspection {
+        match_id: match_id.to_owned(),
+        events: match_events,
     })
 }
 

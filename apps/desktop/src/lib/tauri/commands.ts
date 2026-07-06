@@ -117,6 +117,25 @@ export const tauriImportIosFolder = (directory: string) =>
 export const tauriExportBackup = () =>
   invoke<RustBackupBundle>("export_backup");
 
+export type RustMatchEventSummary = {
+  sessionId: string;
+  sequence: number;
+  timestamp: string;
+  eventType: string;
+  payloadJson: string;
+};
+
+export type RustMatchInspection = {
+  matchId: string;
+  events: RustMatchEventSummary[];
+};
+
+export const tauriInspectMatch = (matchId: string) =>
+  invoke<RustMatchInspection>("inspect_match", { matchId });
+
+export const tauriWriteExportFile = (path: string, contents: string) =>
+  invoke<string>("write_export_file", { path, contents });
+
 export type RustWatcherStatus = {
   running: boolean;
   logPath: string | null;
