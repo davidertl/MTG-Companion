@@ -14,6 +14,9 @@ fn main() {
                 mancutg_arenac::commands::import_ios_file,
                 mancutg_arenac::commands::import_ios_folder,
                 mancutg_arenac::commands::export_backup,
+                mancutg_arenac::commands::start_watcher,
+                mancutg_arenac::commands::stop_watcher,
+                mancutg_arenac::commands::watcher_status,
             ])
             .run(tauri::generate_context!())
             .expect("error running MancuTG-ArenaC");

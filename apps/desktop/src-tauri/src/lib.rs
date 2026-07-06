@@ -14,6 +14,13 @@ use std::{
     env,
     fs,
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, RecvTimeoutError, Sender},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
+    time::Duration,
 };
 
 #[derive(Debug, Serialize)]
@@ -63,6 +70,59 @@ pub struct LiveLogWatchSummary {
     pub rotation_detected: bool,
     pub truncation_detected: bool,
     pub pending_fragment_bytes: usize,
+}
+
+/// Snapshot of the continuous live watcher, returned by the `watcher_status`
+/// command. Always carries `default_log_path` (from
+/// [`default_arena_log_path`]) so the UI can surface a real Arena log path
+/// even before a watcher has been started.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WatcherStatus {
+    pub running: bool,
+    pub log_path: Option<String>,
+    pub default_log_path: Option<String>,
+    pub ingest_count: usize,
+    pub total_inserted_events: usize,
+    pub total_inserted_raw_chunks: usize,
+    pub last_error: Option<String>,
+}
+
+impl WatcherStatus {
+    fn default_log_path_string() -> Option<String> {
+        default_arena_log_path().map(|path| path.to_string_lossy().into_owned())
+    }
+
+    /// Status when no watcher is running.
+    pub fn idle() -> Self {
+        Self {
+            running: false,
+            log_path: None,
+            default_log_path: Self::default_log_path_string(),
+            ingest_count: 0,
+            total_inserted_events: 0,
+            total_inserted_raw_chunks: 0,
+            last_error: None,
+        }
+    }
+
+    fn running(log_path: &Path) -> Self {
+        Self {
+            running: true,
+            log_path: Some(log_path.to_string_lossy().into_owned()),
+            default_log_path: Self::default_log_path_string(),
+            ingest_count: 0,
+            total_inserted_events: 0,
+            total_inserted_raw_chunks: 0,
+            last_error: None,
+        }
+    }
+
+    fn record_ingest(&mut self, summary: &LiveLogWatchSummary) {
+        self.ingest_count += 1;
+        self.total_inserted_events += summary.inserted_events;
+        self.total_inserted_raw_chunks += summary.inserted_raw_chunks;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,6 +255,45 @@ fn resolve_card_db_path(optional_card_db_path: Option<&str>) -> Result<PathBuf, 
     match optional_card_db_path {
         Some(path) => Ok(PathBuf::from(path)),
         None => default_card_db_path(),
+    }
+}
+
+/// Best-effort detection of the default MTG Arena `Player.log` location for
+/// the current operating system. Returns `None` on platforms where the
+/// location is unknown (e.g. Linux dev/CI hosts) or when the required
+/// environment variables are absent. This is surfaced through
+/// [`watcher_status`] so the Setup view can display a real log path instead
+/// of an always-"Pending" placeholder.
+pub fn default_arena_log_path() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        // %AppData% points at ...\AppData\Roaming; the Arena log lives in the
+        // sibling LocalLow tree, hence the `..` hop.
+        env::var_os("APPDATA").map(|appdata| {
+            PathBuf::from(appdata)
+                .join("..")
+                .join("LocalLow")
+                .join("Wizards Of The Coast")
+                .join("MTGA")
+                .join("Player.log")
+        })
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        env::var_os("HOME").map(|home| {
+            PathBuf::from(home)
+                .join("Library")
+                .join("Logs")
+                .join("Wizards Of The Coast")
+                .join("MTGA")
+                .join("Player.log")
+        })
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        None
     }
 }
 
@@ -663,6 +762,230 @@ pub fn watch_live_log_once_with_store(
     })
 }
 
+/// Default poll interval for the follow loop when no filesystem event
+/// arrives. `notify` events short-circuit the wait, so this is only the
+/// worst-case latency (matching the plan's "~2s poll fallback").
+pub const DEFAULT_FOLLOW_POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+/// Cooperative stop signal shared between a [`LiveWatcherHandle`] and its
+/// background follow thread. Cheap to clone (an `Arc<AtomicBool>` inside).
+#[derive(Clone, Default)]
+pub struct WatcherControl {
+    stop: Arc<AtomicBool>,
+}
+
+impl WatcherControl {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Requests the follow loop to terminate. Idempotent: calling it more
+    /// than once is harmless.
+    pub fn stop(&self) {
+        self.stop.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        self.stop.load(Ordering::SeqCst)
+    }
+}
+
+/// Owns a running follow thread plus its stop signal and live status. Drop
+/// or [`LiveWatcherHandle::stop`] signals the thread to wind down; the loop's
+/// poll interval bounds how quickly it observes the request.
+pub struct LiveWatcherHandle {
+    control: WatcherControl,
+    join: Option<JoinHandle<()>>,
+    status: Arc<Mutex<WatcherStatus>>,
+}
+
+impl LiveWatcherHandle {
+    /// Signals the follow loop to stop. Idempotent.
+    pub fn stop(&self) {
+        self.control.stop();
+    }
+
+    /// Blocks until the follow thread has fully terminated. Consumes the
+    /// handle so it cannot be joined twice.
+    pub fn join(mut self) {
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+
+    /// Returns a snapshot of the current watcher status.
+    pub fn status(&self) -> WatcherStatus {
+        self.status
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_else(|_| WatcherStatus::idle())
+    }
+
+    /// True while the follow thread is still alive and has not been stopped.
+    pub fn is_running(&self) -> bool {
+        !self.control.is_stopped()
+            && self
+                .join
+                .as_ref()
+                .map(|join| !join.is_finished())
+                .unwrap_or(false)
+    }
+}
+
+impl Drop for LiveWatcherHandle {
+    fn drop(&mut self) {
+        self.control.stop();
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
+/// Builds a `notify` watcher on the parent directory of `log_path` so that
+/// file creation, appends, and rotation all wake the follow loop. Returns
+/// `None` (falling back to pure polling) if a watcher cannot be established —
+/// e.g. the parent directory does not exist yet, or the platform backend is
+/// unavailable.
+fn build_log_notify_watcher(
+    log_path: &Path,
+    tx: Sender<()>,
+) -> Option<notify::RecommendedWatcher> {
+    use notify::Watcher as _;
+
+    let parent = log_path.parent().filter(|dir| !dir.as_os_str().is_empty())?;
+    let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+        if event.is_ok() {
+            let _ = tx.send(());
+        }
+    })
+    .ok()?;
+    watcher
+        .watch(parent, notify::RecursiveMode::NonRecursive)
+        .ok()?;
+    Some(watcher)
+}
+
+/// Library-testable continuous follow loop over a single `Player.log`, built
+/// on the proven [`watch_live_log_once_with_store`] incremental core. Blocks
+/// the calling thread until `control` is stopped, invoking `on_ingest` after
+/// every ingest that actually produced new data.
+///
+/// A missing log file is tolerated (the loop simply waits); rotation and
+/// truncation are handled by the underlying incremental core. Transient read
+/// errors never terminate the loop.
+pub fn watch_live_log_follow_with_store(
+    store: &EventStore,
+    log_path: impl AsRef<Path>,
+    control: &WatcherControl,
+    poll_interval: Duration,
+    mut on_ingest: impl FnMut(&LiveLogWatchSummary),
+) -> Result<(), String> {
+    let log_path = log_path.as_ref();
+    let (tx, rx) = mpsc::channel::<()>();
+    // The watcher owns a cloned sender; keeping the original alive here means
+    // the channel never disconnects, so `recv_timeout` always waits the full
+    // poll interval even when no `notify` backend is available.
+    let _keepalive_tx = tx.clone();
+    let _watcher = build_log_notify_watcher(log_path, tx);
+
+    loop {
+        if control.is_stopped() {
+            break;
+        }
+
+        if log_path.exists() {
+            match watch_live_log_once_with_store(store, log_path) {
+                Ok(summary) => {
+                    if summary.inserted_events > 0 || summary.inserted_raw_chunks > 0 {
+                        on_ingest(&summary);
+                    }
+                }
+                // Tolerate transient errors (e.g. the file vanishing between
+                // the existence check and the read during a rotation) — the
+                // follow loop must never crash on malformed or racing input.
+                Err(_error) => {}
+            }
+        }
+
+        if control.is_stopped() {
+            break;
+        }
+
+        match rx.recv_timeout(poll_interval) {
+            Ok(()) => {
+                // Coalesce any bursts of filesystem events into one pass.
+                while rx.try_recv().is_ok() {}
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => {
+                thread::sleep(poll_interval);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Spawns a background thread that follows `log_path` continuously, returning
+/// a [`LiveWatcherHandle`] with start/stop control and live status. The thread
+/// opens its own [`EventStore`] (an `EventStore` connection is `Send` but not
+/// `Sync`, so it is owned by the follow thread). `on_ingest` runs on the
+/// follow thread after each ingest that produced new data.
+pub fn watch_live_log_follow(
+    log_path: PathBuf,
+    optional_store_path: Option<String>,
+    poll_interval: Duration,
+    mut on_ingest: impl FnMut(&LiveLogWatchSummary) + Send + 'static,
+) -> Result<LiveWatcherHandle, String> {
+    let control = WatcherControl::new();
+    let status = Arc::new(Mutex::new(WatcherStatus::running(&log_path)));
+    let thread_control = control.clone();
+    let thread_status = Arc::clone(&status);
+
+    let join = thread::Builder::new()
+        .name("mancutg-live-watcher".to_owned())
+        .spawn(move || {
+            let store = match open_store(optional_store_path.as_deref()) {
+                Ok(store) => store,
+                Err(error) => {
+                    if let Ok(mut guard) = thread_status.lock() {
+                        guard.running = false;
+                        guard.last_error = Some(error);
+                    }
+                    return;
+                }
+            };
+
+            let loop_status = Arc::clone(&thread_status);
+            let result = watch_live_log_follow_with_store(
+                &store,
+                &log_path,
+                &thread_control,
+                poll_interval,
+                |summary| {
+                    if let Ok(mut guard) = loop_status.lock() {
+                        guard.record_ingest(summary);
+                    }
+                    on_ingest(summary);
+                },
+            );
+
+            if let Ok(mut guard) = thread_status.lock() {
+                guard.running = false;
+                if let Err(error) = result {
+                    guard.last_error = Some(error);
+                }
+            }
+        })
+        .map_err(|error| format!("failed to spawn live watcher thread: {error}"))?;
+
+    Ok(LiveWatcherHandle {
+        control,
+        join: Some(join),
+        status,
+    })
+}
+
 fn collect_log_files(roots: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
     let mut collected = BTreeSet::new();
     for root in roots {
@@ -917,7 +1240,26 @@ pub fn card_db_status(
 }
 
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]\n  mancutg-arenac import-card-db <scryfall-bulk.json> [card-db-path]\n  mancutg-arenac card-db-status [card-db-path]\n\nCard database:\n  Download the Scryfall \"Oracle Cards\" bulk data file manually from\n  https://scryfall.com/docs/api/bulk-data and import it with import-card-db.\n  The import runs fully offline (no network calls are ever made) and stores\n  the card database beside the event store as cards.sqlite by default."
+    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path] [--follow]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]\n  mancutg-arenac import-card-db <scryfall-bulk.json> [card-db-path]\n  mancutg-arenac card-db-status [card-db-path]\n\nCard database:\n  Download the Scryfall \"Oracle Cards\" bulk data file manually from\n  https://scryfall.com/docs/api/bulk-data and import it with import-card-db.\n  The import runs fully offline (no network calls are ever made) and stores\n  the card database beside the event store as cards.sqlite by default."
+}
+
+/// Runs `watch-log --follow`: a continuous tail of the Arena log that prints
+/// each ingest summary as a JSON line and blocks until the process is
+/// interrupted (Ctrl-C).
+fn run_watch_log_follow_cli(log_path: &str, store_path: Option<&str>) -> Result<String, String> {
+    println!("Following {log_path} (press Ctrl-C to stop)...");
+    let handle = watch_live_log_follow(
+        PathBuf::from(log_path),
+        store_path.map(|path| path.to_owned()),
+        DEFAULT_FOLLOW_POLL_INTERVAL,
+        |summary| match serde_json::to_string(summary) {
+            Ok(json) => println!("{json}"),
+            Err(error) => eprintln!("failed to serialize watch summary: {error}"),
+        },
+    )?;
+    // Blocks until the follow thread exits; Ctrl-C terminates the process.
+    handle.join();
+    Ok(String::new())
 }
 
 pub fn run_cli(args: &[String]) -> Result<String, String> {
@@ -934,8 +1276,21 @@ pub fn run_cli(args: &[String]) -> Result<String, String> {
                 .map_err(|error| format!("failed to serialize bootstrap result: {error}"))
         }
         "watch-log" => {
-            let log_path = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
-            let result = watch_live_log_once(log_path, args.get(2).map(String::as_str))?;
+            let mut positional = Vec::new();
+            let mut follow = false;
+            for arg in &args[1..] {
+                if arg == "--follow" {
+                    follow = true;
+                } else {
+                    positional.push(arg.as_str());
+                }
+            }
+            let log_path = positional.first().ok_or_else(|| cli_usage().to_owned())?;
+            let store_path = positional.get(1).copied();
+            if follow {
+                return run_watch_log_follow_cli(log_path, store_path);
+            }
+            let result = watch_live_log_once(log_path, store_path)?;
             serde_json::to_string_pretty(&result)
                 .map_err(|error| format!("failed to serialize watch result: {error}"))
         }

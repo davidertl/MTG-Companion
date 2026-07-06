@@ -116,3 +116,22 @@ export const tauriImportIosFolder = (directory: string) =>
 
 export const tauriExportBackup = () =>
   invoke<RustBackupBundle>("export_backup");
+
+export type RustWatcherStatus = {
+  running: boolean;
+  logPath: string | null;
+  defaultLogPath: string | null;
+  ingestCount: number;
+  totalInsertedEvents: number;
+  totalInsertedRawChunks: number;
+  lastError: string | null;
+};
+
+export const tauriStartWatcher = (logPath?: string) =>
+  invoke<RustWatcherStatus>("start_watcher", { logPath: logPath ?? null });
+
+export const tauriStopWatcher = () =>
+  invoke<RustWatcherStatus>("stop_watcher");
+
+export const tauriWatcherStatus = () =>
+  invoke<RustWatcherStatus>("watcher_status");
