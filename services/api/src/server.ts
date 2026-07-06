@@ -30,6 +30,10 @@ import {
   createTournamentRoute,
   getMyRoleRoute,
 } from "./routes/tournaments/index.ts";
+import {
+  listFindingsRoute,
+  reviewFindingRoute,
+} from "./routes/tournaments/findings.ts";
 import type { Store } from "./store/types.ts";
 
 export interface ApiServerOptions {
@@ -160,6 +164,27 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
           if (method === "GET" && segments[2] === "role") {
             return sendJson(response, 200, getMyRoleRoute(authStore, user, tournamentId));
           }
+
+          if (method === "GET" && segments[2] === "findings") {
+            return sendJson(response, 200, listFindingsRoute(authStore, user, tournamentId));
+          }
+        }
+
+        // POST /tournaments/:id/findings/:findingId/review
+        if (
+          segments.length === 5 &&
+          method === "POST" &&
+          segments[2] === "findings" &&
+          segments[4] === "review"
+        ) {
+          const tournamentId = decodeURIComponent(segments[1]);
+          const findingId = decodeURIComponent(segments[3]);
+          const body = await readJsonBody(request);
+          return sendJson(
+            response,
+            200,
+            reviewFindingRoute(authStore, user, tournamentId, findingId, body),
+          );
         }
 
         return sendJson(response, 404, { error: "not-found" });
