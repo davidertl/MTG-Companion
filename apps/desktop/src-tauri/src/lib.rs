@@ -3,7 +3,7 @@ pub mod commands;
 
 use core_domain::{
     CollectionSnapshot, DraftPick, EventType, ImportSourceKind, InventorySnapshot, LogSession,
-    MatchRecord, PlatformTag,
+    MatchRecord, NormalizedEvent, ParseReport, PlatformTag,
 };
 use core_parser::parse_log_lossy;
 use core_store::{EventStore, IngestDiagnosticRecord, LogCheckpointRecord};
@@ -274,6 +274,24 @@ pub struct MatchTimeline {
     pub timeline: core_gamestate::GameTimeline,
 }
 
+/// Read model backing the `analyze_match` command: the deterministic rule-check
+/// findings raised for one match. Built by folding the match's stored gameplay
+/// events into a timeline and running the pure `core-analysis` engine against
+/// the sibling `cards.sqlite` card DB (when present). Each finding is also
+/// persisted as an append-only `analysis.finding.raised` event so sync,
+/// projections, and review reuse the existing event machinery.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchAnalysis {
+    pub match_id: String,
+    /// Whether a card DB was available; several checks stay silent without one.
+    pub card_db_available: bool,
+    /// Findings persisted this run (0 when re-analyzing yields identical events,
+    /// since the event store deduplicates append-only rows).
+    pub persisted_events: usize,
+    pub findings: Vec<core_analysis::Finding>,
+}
+
 fn default_store_path() -> Result<PathBuf, String> {
     env::current_dir()
         .map(|cwd| cwd.join("mancutg-arenac.sqlite3"))
@@ -511,6 +529,32 @@ pub fn load_game_timeline(
 ) -> Result<MatchTimeline, String> {
     let store = open_store(optional_store_path)?;
     build_game_timeline(&store, match_id)
+}
+
+/// Runs the deterministic rules checker over `match_id`: folds the match's
+/// stored gameplay events into a timeline, opens the sibling `cards.sqlite` card
+/// DB when it exists (passing `None` otherwise — the engine is pure and
+/// carddb-optional), runs `core-analysis`, and persists each finding as an
+/// append-only `analysis.finding.raised` event before returning them. Re-running
+/// is idempotent: identical findings deduplicate against the event store's
+/// append-only unique constraint.
+pub fn analyze_match(
+    match_id: &str,
+    optional_store_path: Option<&str>,
+) -> Result<MatchAnalysis, String> {
+    let store = open_store(optional_store_path)?;
+    let card_db_path = default_card_db_path()?;
+    let carddb = if card_db_path.exists() {
+        Some(core_carddb::CardDb::open(&card_db_path).map_err(|error| {
+            format!(
+                "failed to open card database {}: {error}",
+                card_db_path.display()
+            )
+        })?)
+    } else {
+        None
+    };
+    build_match_analysis(&store, match_id, carddb.as_ref())
 }
 
 /// Writes `contents` verbatim to `path`. Used by the desktop export flow after
@@ -1237,6 +1281,78 @@ fn build_game_timeline(store: &EventStore, match_id: &str) -> Result<MatchTimeli
     Ok(MatchTimeline {
         match_id: match_id.to_owned(),
         timeline: core_gamestate::GameTimeline::from_events(&match_events),
+    })
+}
+
+/// Folds the match's stored gameplay events into a timeline, runs the pure
+/// `core-analysis` engine (with the given optional card DB), persists each
+/// finding as an append-only `analysis.finding.raised` event, and returns the
+/// findings. Read side mirrors [`build_game_timeline`]; the write side is a
+/// pure append (no event mutation), preserving the append-only invariant.
+fn build_match_analysis(
+    store: &EventStore,
+    match_id: &str,
+    carddb: Option<&core_carddb::CardDb>,
+) -> Result<MatchAnalysis, String> {
+    let events = store
+        .load_events()
+        .map_err(|error| format!("failed to load events: {error}"))?;
+    let match_events: Vec<_> = events
+        .into_iter()
+        .filter(|event| {
+            core_domain::payload_value(&event.payload, "match_id").as_deref() == Some(match_id)
+        })
+        .collect();
+
+    let timeline = core_gamestate::GameTimeline::from_events(&match_events);
+    let findings = core_analysis::analyze_with_game_key(&timeline, carddb, match_id);
+
+    let report = build_findings_report(match_id, &findings)?;
+    let persist_stats = store
+        .apply_report(&report)
+        .map_err(|error| format!("failed to persist analysis findings: {error}"))?;
+
+    Ok(MatchAnalysis {
+        match_id: match_id.to_owned(),
+        card_db_available: carddb.is_some(),
+        persisted_events: persist_stats.inserted_events,
+        findings,
+    })
+}
+
+/// Builds an append-only [`ParseReport`] of `analysis.finding.raised` events —
+/// one per finding — for a match. The `match_id` is added to each finding's
+/// payload so the events group with the rest of the match; the stable
+/// `session_id`/`sequence` pairing plus the store's full-row unique constraint
+/// make re-persisting identical findings idempotent.
+fn build_findings_report(
+    match_id: &str,
+    findings: &[core_analysis::Finding],
+) -> Result<ParseReport, String> {
+    let session_id = format!("analysis-{match_id}");
+    let mut events = Vec::with_capacity(findings.len());
+    for (index, finding) in findings.iter().enumerate() {
+        let mut payload = serde_json::to_value(finding)
+            .map_err(|error| format!("failed to serialize finding: {error}"))?;
+        if let serde_json::Value::Object(map) = &mut payload {
+            map.insert(
+                "match_id".to_owned(),
+                serde_json::Value::String(match_id.to_owned()),
+            );
+        }
+        events.push(NormalizedEvent {
+            session_id: session_id.clone(),
+            sequence: index as u64,
+            timestamp: String::new(),
+            event_type: EventType::from_label("analysis.finding.raised"),
+            payload,
+        });
+    }
+
+    Ok(ParseReport {
+        raw_chunks: Vec::new(),
+        events,
+        next_offset: 0,
     })
 }
 

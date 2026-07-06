@@ -342,6 +342,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-analysis"
+version = "0.1.0"
+dependencies = [
+ "core-carddb",
+ "core-domain",
+ "core-gamestate",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "core-carddb"
 version = "0.1.0"
 dependencies = [
@@ -1828,6 +1839,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 name = "mancutg-arenac"
 version = "0.1.0"
 dependencies = [
+ "core-analysis",
  "core-carddb",
  "core-domain",
  "core-gamestate",

@@ -1,6 +1,7 @@
 use crate::{
     ArenaSettings, BackupBundle, DesktopBootstrap, LiveLogWatchSummary, LiveWatcherHandle,
-    LocalStoreSummary, MatchInspection, MatchTimeline, OfflineLogImportSummary, WatcherStatus,
+    LocalStoreSummary, MatchAnalysis, MatchInspection, MatchTimeline, OfflineLogImportSummary,
+    WatcherStatus,
 };
 use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
@@ -68,6 +69,16 @@ pub fn inspect_match(match_id: String) -> Result<MatchInspection, String> {
 #[tauri::command]
 pub fn load_game_timeline(match_id: String) -> Result<MatchTimeline, String> {
     crate::load_game_timeline(&match_id, None)
+}
+
+/// Runs the deterministic rules checker over `match_id` and returns the raised
+/// findings. Each finding is also persisted as an append-only
+/// `analysis.finding.raised` event (read-only over gameplay events; append-only
+/// for findings — no event mutation). Findings are hints for a human reviewer,
+/// never verdicts.
+#[tauri::command]
+pub fn analyze_match(match_id: String) -> Result<MatchAnalysis, String> {
+    crate::analyze_match(&match_id, None)
 }
 
 /// Writes already-serialized export contents to a user-chosen path (obtained

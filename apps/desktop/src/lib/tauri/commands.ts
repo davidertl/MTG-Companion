@@ -196,6 +196,34 @@ export type RustMatchTimeline = {
 export const tauriLoadGameTimeline = (matchId: string) =>
   invoke<RustMatchTimeline>("load_game_timeline", { matchId });
 
+// Analysis findings (core-analysis). Mirrors the frozen analysisFindingSchema
+// field-for-field (camelCase); kind/severity/audience are the schema's string
+// unions, code is an open string.
+export type RustFinding = {
+  findingId: string;
+  gameKey: string;
+  turnNumber: number;
+  phase: string;
+  kind: "rule-check" | "suggestion";
+  code: string;
+  severity: "info" | "warning" | "possible-violation";
+  confidence: number;
+  ruleRefs: string[];
+  description: string;
+  audience: "players" | "referee-only" | "all";
+  engineVersion: string;
+};
+
+export type RustMatchAnalysis = {
+  matchId: string;
+  cardDbAvailable: boolean;
+  persistedEvents: number;
+  findings: RustFinding[];
+};
+
+export const tauriAnalyzeMatch = (matchId: string) =>
+  invoke<RustMatchAnalysis>("analyze_match", { matchId });
+
 export const tauriWriteExportFile = (path: string, contents: string) =>
   invoke<string>("write_export_file", { path, contents });
 
