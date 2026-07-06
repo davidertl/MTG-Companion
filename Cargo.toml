@@ -3,6 +3,7 @@ members = [
   "apps/desktop/src-tauri",
   "crates/core-carddb",
   "crates/core-domain",
+  "crates/core-gamestate",
   "crates/core-parser",
   "crates/core-store",
   "crates/core-sync",

@@ -1,6 +1,6 @@
 use crate::{
     ArenaSettings, BackupBundle, DesktopBootstrap, LiveLogWatchSummary, LiveWatcherHandle,
-    LocalStoreSummary, MatchInspection, OfflineLogImportSummary, WatcherStatus,
+    LocalStoreSummary, MatchInspection, MatchTimeline, OfflineLogImportSummary, WatcherStatus,
 };
 use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
@@ -59,6 +59,15 @@ pub fn export_backup() -> Result<BackupBundle, String> {
 #[tauri::command]
 pub fn inspect_match(match_id: String) -> Result<MatchInspection, String> {
     crate::inspect_match(&match_id, None)
+}
+
+/// Returns the reconstructed per-turn game timeline for `match_id`, folding the
+/// match's stored gameplay events through the pure `core-gamestate` engine
+/// (read-only projection; partial logs yield a `Partial` completeness marker
+/// rather than an error).
+#[tauri::command]
+pub fn load_game_timeline(match_id: String) -> Result<MatchTimeline, String> {
+    crate::load_game_timeline(&match_id, None)
 }
 
 /// Writes already-serialized export contents to a user-chosen path (obtained

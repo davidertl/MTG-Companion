@@ -262,6 +262,18 @@ pub struct MatchInspection {
     pub events: Vec<MatchEventSummary>,
 }
 
+/// Read model backing the `load_game_timeline` command: the reconstructed
+/// per-turn [`core_gamestate::GameTimeline`] for one match. Built by folding the
+/// match's stored gameplay events through the pure `core-gamestate` engine — a
+/// read-only projection, no I/O beyond the event read (append-only invariant
+/// untouched).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchTimeline {
+    pub match_id: String,
+    pub timeline: core_gamestate::GameTimeline,
+}
+
 fn default_store_path() -> Result<PathBuf, String> {
     env::current_dir()
         .map(|cwd| cwd.join("mancutg-arenac.sqlite3"))
@@ -487,6 +499,18 @@ pub fn inspect_match(
 ) -> Result<MatchInspection, String> {
     let store = open_store(optional_store_path)?;
     build_match_inspection(&store, match_id)
+}
+
+/// Reconstructs the per-turn game timeline for `match_id` by folding the match's
+/// stored gameplay events through the pure `core-gamestate` engine. Uses the
+/// same `match_id`-in-payload grouping convention as [`inspect_match`], so the
+/// timeline covers exactly the events the match-detail view lists. Read-only.
+pub fn load_game_timeline(
+    match_id: &str,
+    optional_store_path: Option<&str>,
+) -> Result<MatchTimeline, String> {
+    let store = open_store(optional_store_path)?;
+    build_game_timeline(&store, match_id)
 }
 
 /// Writes `contents` verbatim to `path`. Used by the desktop export flow after
@@ -1191,6 +1215,28 @@ fn build_match_inspection(
     Ok(MatchInspection {
         match_id: match_id.to_owned(),
         events: match_events,
+    })
+}
+
+/// Loads the match's events and folds the ones belonging to `match_id` into a
+/// [`core_gamestate::GameTimeline`]. Events without a `match_id` in payload are
+/// skipped, mirroring [`build_match_inspection`]; the fold itself is pure and
+/// gap-tolerant (partial logs yield `Completeness::Partial`, never an error).
+fn build_game_timeline(store: &EventStore, match_id: &str) -> Result<MatchTimeline, String> {
+    let events = store
+        .load_events()
+        .map_err(|error| format!("failed to load events: {error}"))?;
+
+    let match_events: Vec<_> = events
+        .into_iter()
+        .filter(|event| {
+            core_domain::payload_value(&event.payload, "match_id").as_deref() == Some(match_id)
+        })
+        .collect();
+
+    Ok(MatchTimeline {
+        match_id: match_id.to_owned(),
+        timeline: core_gamestate::GameTimeline::from_events(&match_events),
     })
 }
 

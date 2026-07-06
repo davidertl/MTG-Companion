@@ -133,6 +133,69 @@ export type RustMatchInspection = {
 export const tauriInspectMatch = (matchId: string) =>
   invoke<RustMatchInspection>("inspect_match", { matchId });
 
+// Reconstructed per-turn game timeline (core-gamestate). Zone/action shapes are
+// intentionally loose here — the desktop timeline view treats them structurally;
+// core-domain field casing (snake_case) is preserved verbatim.
+export type RustCardRef = {
+  name?: string;
+  arenaId?: number;
+  scryfallOracleId?: string;
+};
+
+export type RustObjectState = {
+  instanceId?: number;
+  cardRef: RustCardRef;
+  controller?: string;
+  tapped: boolean;
+  counters?: Record<string, number>;
+};
+
+export type RustPlayerZones = {
+  battlefield: RustObjectState[];
+  graveyard: RustObjectState[];
+  exile: RustObjectState[];
+  handCount: number;
+  libraryCount: number;
+};
+
+export type RustTimelineAction =
+  | { source: "parsed"; [key: string]: unknown }
+  | {
+      source: "raw";
+      eventType: string;
+      sequence: number;
+      payload: unknown;
+      note: string;
+    };
+
+export type RustTurnSnapshot = {
+  turnNumber: number;
+  activePlayer?: string;
+  phase?: string;
+  step?: string;
+  zones: Record<string, RustPlayerZones>;
+  lifeTotals: Record<string, number>;
+  actions: RustTimelineAction[];
+};
+
+export type RustCompleteness =
+  | { kind: "complete" }
+  | { kind: "partial"; reason: string };
+
+export type RustGameTimeline = {
+  turns: RustTurnSnapshot[];
+  completeness: RustCompleteness;
+  notes: string[];
+};
+
+export type RustMatchTimeline = {
+  matchId: string;
+  timeline: RustGameTimeline;
+};
+
+export const tauriLoadGameTimeline = (matchId: string) =>
+  invoke<RustMatchTimeline>("load_game_timeline", { matchId });
+
 export const tauriWriteExportFile = (path: string, contents: string) =>
   invoke<string>("write_export_file", { path, contents });
 
