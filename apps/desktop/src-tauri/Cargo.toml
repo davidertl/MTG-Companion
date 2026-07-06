@@ -13,6 +13,7 @@ name = "mancutg-arenac-cli"
 path = "src/cli_main.rs"
 
 [dependencies]
+core-carddb = { path = "../../../crates/core-carddb" }
 core-parser = { path = "../../../crates/core-parser" }
 core-store = { path = "../../../crates/core-store" }
 core-domain = { path = "../../../crates/core-domain" }

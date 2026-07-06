@@ -67,6 +67,100 @@ fn cli_import_ios_file_returns_import_summary() {
 }
 
 #[test]
+fn cli_card_db_import_and_status_report_counts() {
+    let bulk_path = temp_path("oracle-cards.json");
+    let card_db_path = temp_path("cards.sqlite");
+    fs::write(
+        &bulk_path,
+        r#"[
+  {
+    "id": "33333333-3333-4333-8333-000000000001",
+    "oracle_id": "44444444-4444-4444-8444-000000000001",
+    "name": "Fixture Bolt",
+    "mana_cost": "{R}",
+    "cmc": 1.0,
+    "type_line": "Instant",
+    "oracle_text": "Fixture Bolt deals 3 damage to any target.",
+    "colors": ["R"],
+    "keywords": [],
+    "legalities": { "historic": "legal" },
+    "set": "tst",
+    "arena_id": 90001
+  },
+  {
+    "id": "33333333-3333-4333-8333-000000000002",
+    "oracle_id": "44444444-4444-4444-8444-000000000002",
+    "name": "Fixture Bear",
+    "mana_cost": "{1}{G}",
+    "cmc": 2.0,
+    "type_line": "Creature — Bear",
+    "colors": ["G"],
+    "set": "tst"
+  }
+]"#,
+    )
+    .expect("bulk fixture should be written");
+
+    let import_output = run_cli(&[
+        "import-card-db".to_owned(),
+        bulk_path.to_string_lossy().into_owned(),
+        card_db_path.to_string_lossy().into_owned(),
+    ])
+    .expect("cli card db import should succeed");
+    let import_json: serde_json::Value =
+        serde_json::from_str(&import_output).expect("cli card db import should return json");
+
+    assert_eq!(import_json["importedCards"], 2);
+    assert_eq!(import_json["skippedEntries"], 0);
+    assert_eq!(import_json["cardCount"], 2);
+    assert_eq!(import_json["withArenaIdCount"], 1);
+
+    let status_output = run_cli(&[
+        "card-db-status".to_owned(),
+        card_db_path.to_string_lossy().into_owned(),
+    ])
+    .expect("cli card db status should succeed");
+    let status_json: serde_json::Value =
+        serde_json::from_str(&status_output).expect("cli card db status should return json");
+
+    assert_eq!(status_json["cardDbExists"], true);
+    assert_eq!(status_json["cardCount"], 2);
+    assert_eq!(status_json["withArenaIdCount"], 1);
+
+    fs::remove_file(bulk_path).expect("temporary bulk file should be removable");
+    fs::remove_file(card_db_path).expect("temporary card db should be removable");
+}
+
+#[test]
+fn cli_card_db_status_reports_missing_database_without_creating_it() {
+    let card_db_path = temp_path("missing-cards.sqlite");
+
+    let output = run_cli(&[
+        "card-db-status".to_owned(),
+        card_db_path.to_string_lossy().into_owned(),
+    ])
+    .expect("cli card db status should succeed for a missing database");
+    let json: serde_json::Value =
+        serde_json::from_str(&output).expect("cli card db status should return json");
+
+    assert_eq!(json["cardDbExists"], false);
+    assert_eq!(json["cardCount"], 0);
+    assert!(
+        !card_db_path.exists(),
+        "status must not create the card database file"
+    );
+}
+
+#[test]
+fn cli_usage_documents_card_db_commands_and_scryfall_source() {
+    let usage = mancutg_arenac::cli_usage();
+
+    assert!(usage.contains("import-card-db"));
+    assert!(usage.contains("card-db-status"));
+    assert!(usage.contains("https://scryfall.com/docs/api/bulk-data"));
+}
+
+#[test]
 fn cli_watch_log_returns_incremental_watch_summary() {
     let log_path = temp_path("watch.log");
     let store_path = temp_path("watch-store.sqlite3");

@@ -147,6 +147,26 @@ pub struct BackupBundle {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CardDbImportSummary {
+    pub card_db_path: String,
+    pub bulk_path: String,
+    pub imported_cards: usize,
+    pub skipped_entries: usize,
+    pub card_count: usize,
+    pub with_arena_id_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardDbStatusSummary {
+    pub card_db_path: String,
+    pub card_db_exists: bool,
+    pub card_count: usize,
+    pub with_arena_id_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LocalStoreSummary {
     pub sessions: Vec<ImportedSessionSummary>,
     pub match_history: Vec<MatchRecord>,
@@ -162,6 +182,20 @@ fn default_store_path() -> Result<PathBuf, String> {
     env::current_dir()
         .map(|cwd| cwd.join("mancutg-arenac.sqlite3"))
         .map_err(|error| format!("failed to determine current directory: {error}"))
+}
+
+/// The card database is a sibling file of the event store
+/// (`default_store_path()`), populated exclusively via the offline
+/// `import-card-db` CLI command — never by runtime network calls.
+fn default_card_db_path() -> Result<PathBuf, String> {
+    Ok(default_store_path()?.with_file_name("cards.sqlite"))
+}
+
+fn resolve_card_db_path(optional_card_db_path: Option<&str>) -> Result<PathBuf, String> {
+    match optional_card_db_path {
+        Some(path) => Ok(PathBuf::from(path)),
+        None => default_card_db_path(),
+    }
 }
 
 fn default_settings_path() -> Result<PathBuf, String> {
@@ -816,8 +850,74 @@ fn update_allowed_purpose(allowed_purposes: &mut Vec<String>, purpose: &str, ena
     }
 }
 
+/// Imports a manually downloaded Scryfall bulk-data file ("Oracle Cards",
+/// see <https://scryfall.com/docs/api/bulk-data>) into the local card
+/// database beside the event store. Fully offline: reads only the given
+/// file, streams it (never loads the ~2GB bulk file into memory), and is
+/// idempotent on re-import.
+pub fn import_card_db(
+    bulk_path: &str,
+    optional_card_db_path: Option<&str>,
+) -> Result<CardDbImportSummary, String> {
+    let card_db_path = resolve_card_db_path(optional_card_db_path)?;
+    let bulk_file = fs::File::open(bulk_path)
+        .map_err(|error| format!("failed to open Scryfall bulk file {bulk_path}: {error}"))?;
+    let card_db = core_carddb::CardDb::open(&card_db_path).map_err(|error| {
+        format!(
+            "failed to open card database {}: {error}",
+            card_db_path.display()
+        )
+    })?;
+    let stats = card_db
+        .import_scryfall_bulk(bulk_file)
+        .map_err(|error| format!("failed to import Scryfall bulk file {bulk_path}: {error}"))?;
+    let status = card_db
+        .status()
+        .map_err(|error| format!("failed to read card database status: {error}"))?;
+
+    Ok(CardDbImportSummary {
+        card_db_path: card_db_path.to_string_lossy().into_owned(),
+        bulk_path: bulk_path.to_owned(),
+        imported_cards: stats.imported_cards,
+        skipped_entries: stats.skipped_entries,
+        card_count: status.card_count,
+        with_arena_id_count: status.with_arena_id_count,
+    })
+}
+
+pub fn card_db_status(
+    optional_card_db_path: Option<&str>,
+) -> Result<CardDbStatusSummary, String> {
+    let card_db_path = resolve_card_db_path(optional_card_db_path)?;
+    if !card_db_path.exists() {
+        return Ok(CardDbStatusSummary {
+            card_db_path: card_db_path.to_string_lossy().into_owned(),
+            card_db_exists: false,
+            card_count: 0,
+            with_arena_id_count: 0,
+        });
+    }
+
+    let card_db = core_carddb::CardDb::open(&card_db_path).map_err(|error| {
+        format!(
+            "failed to open card database {}: {error}",
+            card_db_path.display()
+        )
+    })?;
+    let status = card_db
+        .status()
+        .map_err(|error| format!("failed to read card database status: {error}"))?;
+
+    Ok(CardDbStatusSummary {
+        card_db_path: card_db_path.to_string_lossy().into_owned(),
+        card_db_exists: true,
+        card_count: status.card_count,
+        with_arena_id_count: status.with_arena_id_count,
+    })
+}
+
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]"
+    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]\n  mancutg-arenac import-card-db <scryfall-bulk.json> [card-db-path]\n  mancutg-arenac card-db-status [card-db-path]\n\nCard database:\n  Download the Scryfall \"Oracle Cards\" bulk data file manually from\n  https://scryfall.com/docs/api/bulk-data and import it with import-card-db.\n  The import runs fully offline (no network calls are ever made) and stores\n  the card database beside the event store as cards.sqlite by default."
 }
 
 pub fn run_cli(args: &[String]) -> Result<String, String> {
@@ -894,6 +994,17 @@ pub fn run_cli(args: &[String]) -> Result<String, String> {
             )?;
             serde_json::to_string_pretty(&result)
                 .map_err(|error| format!("failed to serialize import result: {error}"))
+        }
+        "import-card-db" => {
+            let bulk_path = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
+            let result = import_card_db(bulk_path, args.get(2).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize card db import summary: {error}"))
+        }
+        "card-db-status" => {
+            let result = card_db_status(args.get(1).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize card db status: {error}"))
         }
         "import-ios-folder" => {
             let directory = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
