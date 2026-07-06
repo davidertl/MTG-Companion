@@ -3,6 +3,8 @@ import type {
   BackendEventSession,
   MediaArtifact,
   MediaCaptureSession,
+  TournamentMembership,
+  TournamentSettings,
 } from "../../../../packages/shared-schema/src/index.ts";
 
 export type BatchKeyScope = "events" | "media";
@@ -10,6 +12,31 @@ export type BatchKeyScope = "events" | "media";
 export interface StoredEvent {
   cursor: number;
   event: BackendEventEnvelope;
+}
+
+/**
+ * Auth/identity records added by unit W2.3. These live in the same store as the
+ * event/media data so both the JSON and SQLite backends persist them uniformly.
+ * Bearer tokens are never stored in the clear — only their sha256 hash.
+ */
+export interface StoredUser {
+  userId: string;
+  displayName: string;
+  createdAt: string;
+}
+
+export interface StoredToken {
+  tokenHash: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface StoredTournament {
+  tournamentId: string;
+  name?: string;
+  settings: TournamentSettings;
+  createdBy: string;
+  createdAt: string;
 }
 
 /**
@@ -48,6 +75,23 @@ export interface Store {
   hasMediaArtifact(captureSessionId: string, artifactId: string): boolean;
   addMediaArtifact(artifact: MediaArtifact): void;
   countMediaArtifacts(): number;
+
+  // --- Auth / identity (W2.3) ------------------------------------------------
+  // Users are keyed by `userId`; tokens by their sha256 `tokenHash`.
+  insertUser(user: StoredUser): void;
+  getUser(userId: string): StoredUser | undefined;
+
+  insertToken(token: StoredToken): void;
+  findUserIdByTokenHash(tokenHash: string): string | undefined;
+
+  // Tournaments and their per-user role memberships. Membership identity is
+  // (tournamentId, userId) — a user holds at most one role per tournament.
+  insertTournament(tournament: StoredTournament): void;
+  getTournament(tournamentId: string): StoredTournament | undefined;
+
+  upsertMembership(membership: TournamentMembership): void;
+  getMembership(tournamentId: string, userId: string): TournamentMembership | undefined;
+  listMemberships(tournamentId: string): TournamentMembership[];
 
   close?(): void;
 }

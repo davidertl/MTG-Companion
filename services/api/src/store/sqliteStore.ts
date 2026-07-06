@@ -7,6 +7,9 @@ import type {
   BackendEventSession,
   MediaArtifact,
   MediaCaptureSession,
+  TournamentMembership,
+  TournamentRole,
+  TournamentSettings,
 } from "../../../../packages/shared-schema/src/index.ts";
 
 import {
@@ -14,6 +17,9 @@ import {
   type BatchKeyScope,
   type Store,
   type StoredEvent,
+  type StoredToken,
+  type StoredTournament,
+  type StoredUser,
 } from "./types.ts";
 
 const SCHEMA_SQL = `
@@ -55,6 +61,35 @@ CREATE TABLE IF NOT EXISTS seen_batch_keys (
   scope TEXT NOT NULL,
   batch_key TEXT NOT NULL,
   PRIMARY KEY (scope, batch_key)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  user_id TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS auth_tokens (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens (user_id);
+
+CREATE TABLE IF NOT EXISTS tournaments (
+  tournament_id TEXT PRIMARY KEY,
+  name TEXT,
+  settings_json TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS memberships (
+  tournament_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  PRIMARY KEY (tournament_id, user_id)
 );
 `;
 
@@ -245,6 +280,142 @@ export class SqliteEventStore implements Store {
 
   countMediaArtifacts(): number {
     return this.countRows("media_artifacts");
+  }
+
+  insertUser(user: StoredUser): void {
+    this.db
+      .prepare(
+        `INSERT INTO users (user_id, display_name, created_at)
+         VALUES (?, ?, ?)`,
+      )
+      .run(user.userId, user.displayName, user.createdAt);
+  }
+
+  getUser(userId: string): StoredUser | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT user_id, display_name, created_at FROM users WHERE user_id = ?",
+      )
+      .get(userId) as
+      | { user_id: string; display_name: string; created_at: string }
+      | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      userId: row.user_id,
+      displayName: row.display_name,
+      createdAt: row.created_at,
+    };
+  }
+
+  insertToken(token: StoredToken): void {
+    this.db
+      .prepare(
+        `INSERT INTO auth_tokens (token_hash, user_id, created_at)
+         VALUES (?, ?, ?)`,
+      )
+      .run(token.tokenHash, token.userId, token.createdAt);
+  }
+
+  findUserIdByTokenHash(tokenHash: string): string | undefined {
+    const row = this.db
+      .prepare("SELECT user_id FROM auth_tokens WHERE token_hash = ?")
+      .get(tokenHash) as { user_id: string } | undefined;
+    return row?.user_id;
+  }
+
+  insertTournament(tournament: StoredTournament): void {
+    this.db
+      .prepare(
+        `INSERT INTO tournaments (tournament_id, name, settings_json, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        tournament.tournamentId,
+        tournament.name ?? null,
+        JSON.stringify(tournament.settings),
+        tournament.createdBy,
+        tournament.createdAt,
+      );
+  }
+
+  getTournament(tournamentId: string): StoredTournament | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT tournament_id, name, settings_json, created_by, created_at
+         FROM tournaments WHERE tournament_id = ?`,
+      )
+      .get(tournamentId) as
+      | {
+          tournament_id: string;
+          name: string | null;
+          settings_json: string;
+          created_by: string;
+          created_at: string;
+        }
+      | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      tournamentId: row.tournament_id,
+      name: row.name ?? undefined,
+      settings: JSON.parse(row.settings_json) as TournamentSettings,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+    };
+  }
+
+  upsertMembership(membership: TournamentMembership): void {
+    this.db
+      .prepare(
+        `INSERT INTO memberships (tournament_id, user_id, role)
+         VALUES (?, ?, ?)
+         ON CONFLICT (tournament_id, user_id)
+         DO UPDATE SET role = excluded.role`,
+      )
+      .run(membership.tournamentId, membership.userId, membership.role);
+  }
+
+  getMembership(
+    tournamentId: string,
+    userId: string,
+  ): TournamentMembership | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT tournament_id, user_id, role FROM memberships
+         WHERE tournament_id = ? AND user_id = ?`,
+      )
+      .get(tournamentId, userId) as
+      | { tournament_id: string; user_id: string; role: string }
+      | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      tournamentId: row.tournament_id,
+      userId: row.user_id,
+      role: row.role as TournamentRole,
+    };
+  }
+
+  listMemberships(tournamentId: string): TournamentMembership[] {
+    const rows = this.db
+      .prepare(
+        `SELECT tournament_id, user_id, role FROM memberships
+         WHERE tournament_id = ? ORDER BY user_id ASC`,
+      )
+      .all(tournamentId) as Array<{
+      tournament_id: string;
+      user_id: string;
+      role: string;
+    }>;
+    return rows.map((row) => ({
+      tournamentId: row.tournament_id,
+      userId: row.user_id,
+      role: row.role as TournamentRole,
+    }));
   }
 
   close(): void {

@@ -5,10 +5,13 @@ import {
   backendEventSessionSchema,
   mediaArtifactSchema,
   mediaCaptureSessionSchema,
+  tournamentMembershipSchema,
+  tournamentSettingsSchema,
   type BackendEventEnvelope,
   type BackendEventSession,
   type MediaArtifact,
   type MediaCaptureSession,
+  type TournamentMembership,
 } from "../../../../packages/shared-schema/src/index.ts";
 import {
   validatePapercEventContract,
@@ -21,6 +24,9 @@ import {
   type BatchKeyScope,
   type Store,
   type StoredEvent,
+  type StoredToken,
+  type StoredTournament,
+  type StoredUser,
 } from "./types.ts";
 
 type PersistedStoreFile = {
@@ -30,6 +36,10 @@ type PersistedStoreFile = {
   mediaSessions: MediaCaptureSession[];
   mediaArtifacts: MediaArtifact[];
   seenMediaBatchKeys: string[];
+  users: StoredUser[];
+  authTokens: StoredToken[];
+  tournaments: StoredTournament[];
+  memberships: TournamentMembership[];
 };
 
 /**
@@ -45,6 +55,10 @@ export interface EventStore {
   mediaSessions: MediaCaptureSession[];
   mediaArtifacts: MediaArtifact[];
   seenMediaBatchKeys: string[];
+  users: StoredUser[];
+  authTokens: StoredToken[];
+  tournaments: StoredTournament[];
+  memberships: TournamentMembership[];
 }
 
 /** Anything the domain services accept as persistence backend. */
@@ -59,6 +73,10 @@ export function createInMemoryEventStore(): EventStore {
     mediaSessions: [],
     mediaArtifacts: [],
     seenMediaBatchKeys: [],
+    users: [],
+    authTokens: [],
+    tournaments: [],
+    memberships: [],
   };
 }
 
@@ -102,6 +120,10 @@ export class JsonEventStoreAdapter implements Store {
       mediaSessions: [...this.bag.mediaSessions],
       mediaArtifacts: [...this.bag.mediaArtifacts],
       seenMediaBatchKeys: [...this.bag.seenMediaBatchKeys],
+      users: [...this.bag.users],
+      authTokens: [...this.bag.authTokens],
+      tournaments: [...this.bag.tournaments],
+      memberships: [...this.bag.memberships],
     };
 
     try {
@@ -209,6 +231,61 @@ export class JsonEventStoreAdapter implements Store {
     return this.bag.mediaArtifacts.length;
   }
 
+  insertUser(user: StoredUser): void {
+    this.bag.users.push(user);
+  }
+
+  getUser(userId: string): StoredUser | undefined {
+    return this.bag.users.find((user) => user.userId === userId);
+  }
+
+  insertToken(token: StoredToken): void {
+    this.bag.authTokens.push(token);
+  }
+
+  findUserIdByTokenHash(tokenHash: string): string | undefined {
+    return this.bag.authTokens.find((token) => token.tokenHash === tokenHash)?.userId;
+  }
+
+  insertTournament(tournament: StoredTournament): void {
+    this.bag.tournaments.push(tournament);
+  }
+
+  getTournament(tournamentId: string): StoredTournament | undefined {
+    return this.bag.tournaments.find(
+      (tournament) => tournament.tournamentId === tournamentId,
+    );
+  }
+
+  upsertMembership(membership: TournamentMembership): void {
+    const index = this.bag.memberships.findIndex(
+      (existing) =>
+        existing.tournamentId === membership.tournamentId &&
+        existing.userId === membership.userId,
+    );
+    if (index >= 0) {
+      this.bag.memberships[index] = membership;
+    } else {
+      this.bag.memberships.push(membership);
+    }
+  }
+
+  getMembership(
+    tournamentId: string,
+    userId: string,
+  ): TournamentMembership | undefined {
+    return this.bag.memberships.find(
+      (membership) =>
+        membership.tournamentId === tournamentId && membership.userId === userId,
+    );
+  }
+
+  listMemberships(tournamentId: string): TournamentMembership[] {
+    return this.bag.memberships
+      .filter((membership) => membership.tournamentId === tournamentId)
+      .sort((left, right) => left.userId.localeCompare(right.userId));
+  }
+
   private batchKeys(scope: BatchKeyScope): string[] {
     return scope === "events" ? this.bag.seenBatchKeys : this.bag.seenMediaBatchKeys;
   }
@@ -239,6 +316,10 @@ function persistStore(store: EventStore): void {
     mediaSessions: store.mediaSessions,
     mediaArtifacts: store.mediaArtifacts,
     seenMediaBatchKeys: store.seenMediaBatchKeys,
+    users: store.users,
+    authTokens: store.authTokens,
+    tournaments: store.tournaments,
+    memberships: store.memberships,
   };
   const tempPath = `${store.filePath}.tmp`;
   writeFileSync(tempPath, JSON.stringify(persisted, null, 2));
@@ -270,5 +351,52 @@ function parsePersistedStore(input: unknown): PersistedStoreFile {
     seenMediaBatchKeys: Array.isArray(object.seenMediaBatchKeys)
       ? object.seenMediaBatchKeys.filter((item): item is string => typeof item === "string")
       : [],
+    users: Array.isArray(object.users)
+      ? object.users.filter(isStoredUser)
+      : [],
+    authTokens: Array.isArray(object.authTokens)
+      ? object.authTokens.filter(isStoredToken)
+      : [],
+    tournaments: Array.isArray(object.tournaments)
+      ? object.tournaments.map(parseStoredTournament)
+      : [],
+    memberships: Array.isArray(object.memberships)
+      ? object.memberships.map((membership) =>
+          tournamentMembershipSchema.parse(membership),
+        )
+      : [],
+  };
+}
+
+function isStoredUser(candidate: unknown): candidate is StoredUser {
+  const user = candidate as Partial<StoredUser> | null;
+  return (
+    typeof user === "object" &&
+    user !== null &&
+    typeof user.userId === "string" &&
+    typeof user.displayName === "string" &&
+    typeof user.createdAt === "string"
+  );
+}
+
+function isStoredToken(candidate: unknown): candidate is StoredToken {
+  const token = candidate as Partial<StoredToken> | null;
+  return (
+    typeof token === "object" &&
+    token !== null &&
+    typeof token.tokenHash === "string" &&
+    typeof token.userId === "string" &&
+    typeof token.createdAt === "string"
+  );
+}
+
+function parseStoredTournament(candidate: unknown): StoredTournament {
+  const raw = (candidate ?? {}) as Record<string, unknown>;
+  return {
+    tournamentId: String(raw.tournamentId),
+    name: typeof raw.name === "string" ? raw.name : undefined,
+    settings: tournamentSettingsSchema.parse(raw.settings ?? {}),
+    createdBy: String(raw.createdBy),
+    createdAt: String(raw.createdAt),
   };
 }

@@ -1,4 +1,6 @@
 export * from "./auth/optionalMode";
+export * from "./auth/roles";
+export * from "./auth/tokens";
 export * from "./domain/eventService";
 export * from "./domain/syncService";
 export * from "./routes/events";
@@ -6,6 +8,7 @@ export * from "./routes/eventsPull";
 export * from "./routes/integrations/archidekt/import";
 export * from "./routes/media/index";
 export * from "./routes/sync";
+export * from "./routes/tournaments/index";
 export * from "./server";
 export * from "./store/createStore";
 export * from "./store/sqliteStore";
