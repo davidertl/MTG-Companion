@@ -1,0 +1,14 @@
+{
+  "name": "mancutg-paperc-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:card-index": "node --experimental-strip-types ../../scripts/build_card_name_index.ts"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.3",
+    "vite": "^8.0.0"
+  }
+}
