@@ -12,6 +12,7 @@ import {
   tauriWriteExportFile,
   tauriStartWatcher,
   tauriStopWatcher,
+  tauriSyncNow,
 } from "../src/lib/tauri/commands";
 
 afterEach(() => {
@@ -53,5 +54,20 @@ describe("tauri command wrappers", () => {
     invoke.mockResolvedValue({ running: false });
     await tauriStopWatcher();
     expect(invoke).toHaveBeenCalledWith("stop_watcher");
+  });
+
+  it("sync_now invokes the sync command with no arguments", async () => {
+    invoke.mockResolvedValue({
+      syncEnabled: true,
+      attempted: true,
+      batchesSent: 1,
+      eventsSynced: 3,
+      pendingRemaining: 0,
+      backendUrl: "http://127.0.0.1:8787/events",
+      lastError: null,
+    });
+    const outcome = await tauriSyncNow();
+    expect(invoke).toHaveBeenCalledWith("sync_now");
+    expect(outcome.eventsSynced).toBe(3);
   });
 });

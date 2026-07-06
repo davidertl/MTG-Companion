@@ -240,6 +240,21 @@ export const tauriCardDbStatus = () =>
 export const tauriWriteExportFile = (path: string, contents: string) =>
   invoke<string>("write_export_file", { path, contents });
 
+// Desktop sync transport (W4.3). Mirrors `SyncOutcome` (camelCase). `attempted`
+// is false and every counter zero when sync consent is off — the hard gate that
+// guarantees zero network calls for unconsented users.
+export type RustSyncOutcome = {
+  syncEnabled: boolean;
+  attempted: boolean;
+  batchesSent: number;
+  eventsSynced: number;
+  pendingRemaining: number;
+  backendUrl: string;
+  lastError: string | null;
+};
+
+export const tauriSyncNow = () => invoke<RustSyncOutcome>("sync_now");
+
 export type RustWatcherStatus = {
   running: boolean;
   logPath: string | null;

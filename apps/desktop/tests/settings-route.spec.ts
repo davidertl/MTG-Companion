@@ -20,4 +20,47 @@ describe("settings route state", () => {
       expect.arrayContaining(["Set consent", "Reset settings", "Wipe local data"]),
     );
   });
+
+  it("hard-gates the Sync now trigger and reports a disabled status when sync is off", () => {
+    const settings = createPrivacySettings({ syncEnabled: false });
+    const state = buildSettingsState(settings);
+
+    expect(state.sync.canSyncNow).toBe(false);
+    expect(state.sync.triggerLabel).toBe("Sync now");
+    expect(state.sync.status.state).toBe("disabled");
+    expect(state.actions).toEqual(expect.arrayContaining(["Sync now"]));
+  });
+
+  it("surfaces the last sync outcome when sync is enabled", () => {
+    const settings = createPrivacySettings({
+      syncEnabled: true,
+      allowedPurposes: ["updates", "sync"],
+    });
+
+    const idle = buildSettingsState(settings);
+    expect(idle.sync.canSyncNow).toBe(true);
+    expect(idle.sync.status.state).toBe("idle");
+
+    const synced = buildSettingsState(settings, {
+      syncOutcome: {
+        attempted: true,
+        eventsSynced: 5,
+        pendingRemaining: 0,
+        lastError: null,
+      },
+    });
+    expect(synced.sync.status.state).toBe("ok");
+    expect(synced.sync.status.message).toContain("5");
+
+    const failed = buildSettingsState(settings, {
+      syncOutcome: {
+        attempted: true,
+        eventsSynced: 0,
+        pendingRemaining: 2,
+        lastError: "transport error: connection refused",
+      },
+    });
+    expect(failed.sync.status.state).toBe("error");
+    expect(failed.sync.status.message).toContain("connection refused");
+  });
 });

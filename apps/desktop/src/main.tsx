@@ -36,11 +36,13 @@ import {
   tauriStartWatcher,
   tauriStopWatcher,
   tauriWatcherStatus,
+  tauriSyncNow,
   type RustLocalStoreSummary,
   type RustArenaSettings,
   type RustWatcherStatus,
   type RustCardDbStatus,
 } from "./lib/tauri/commands";
+import type { SyncOutcomeView } from "./routes/settings/index";
 
 function mapStoreToInput(
   store: RustLocalStoreSummary,
@@ -118,6 +120,7 @@ function App() {
   });
   const [watcher, setWatcher] = useState<RustWatcherStatus | null>(null);
   const [cardDb, setCardDb] = useState<RustCardDbStatus | null>(null);
+  const [syncOutcome, setSyncOutcome] = useState<SyncOutcomeView | null>(null);
   const [analysisEnabled, setAnalysisEnabled] = useState<boolean>(() =>
     readAnalysisEnabled(),
   );
@@ -307,6 +310,17 @@ function App() {
               }),
             writeFile: tauriWriteExportFile,
           });
+        } else if (label === "Sync now") {
+          // Hard-gated on the Rust side: when sync consent is off this is a
+          // no-op that makes zero network calls.
+          const outcome = await tauriSyncNow();
+          setSyncOutcome({
+            attempted: outcome.attempted,
+            eventsSynced: outcome.eventsSynced,
+            pendingRemaining: outcome.pendingRemaining,
+            lastError: outcome.lastError,
+          });
+          await refresh();
         }
         setError(null);
       } catch (err) {
@@ -335,7 +349,7 @@ function App() {
     );
   }
 
-  const state = buildArenaAppShellState(input);
+  const state = buildArenaAppShellState({ ...input, syncOutcome });
 
   return (
     <>

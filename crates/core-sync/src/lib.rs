@@ -1,3 +1,11 @@
+pub mod outbox;
+
+pub use outbox::{
+    backoff_delay, sync_outbox, BatchContext, BatchTransport, DrainConfig, DrainReport, Outbox,
+    OutboxEventInput, OutboxRow, SyncBatch, SyncEventEnvelope, SyncProvenance, SyncSessionEnvelope,
+    TransportOutcome,
+};
+
 use core_domain::SyncObject;
 
 pub fn queue_sync_object(object_type: &str, object_id: &str, payload: serde_json::Value) -> SyncObject {

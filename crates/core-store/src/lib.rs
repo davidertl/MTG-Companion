@@ -417,7 +417,13 @@ impl EventStore {
     }
 
     fn migrate(&self) -> rusqlite::Result<()> {
-        self.connection.execute_batch(include_str!("../migrations/001_init.sql"))
+        // Migrations run in order; each is idempotent (CREATE TABLE/INDEX IF NOT
+        // EXISTS), so re-opening an existing store is safe. 002 adds the sync
+        // outbox consumed by `core-sync` (W4.3).
+        self.connection
+            .execute_batch(include_str!("../migrations/001_init.sql"))?;
+        self.connection
+            .execute_batch(include_str!("../migrations/002_outbox.sql"))
     }
 }
 

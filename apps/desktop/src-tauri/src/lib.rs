@@ -292,6 +292,41 @@ pub struct MatchAnalysis {
     pub findings: Vec<core_analysis::Finding>,
 }
 
+/// Outcome of a [`sync_now`] pass, surfaced to the settings UI.
+///
+/// `attempted` is `false` (and every counter zero) when sync consent is off —
+/// the hard gate that guarantees zero network calls for offline/unconsented
+/// users. `backend_url` is echoed back so the UI can show where events go.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncOutcome {
+    pub sync_enabled: bool,
+    pub attempted: bool,
+    pub batches_sent: usize,
+    pub events_synced: usize,
+    pub pending_remaining: usize,
+    pub backend_url: String,
+    pub last_error: Option<String>,
+}
+
+/// Default backend base URL for sync; overridable via `MANCUTG_BACKEND_URL`
+/// (e.g. to point at a non-local backend). The `/events` path is appended when
+/// posting. Matches the `npm run api:start` port (8787).
+const DEFAULT_BACKEND_BASE_URL: &str = "http://127.0.0.1:8787";
+
+fn backend_events_url() -> String {
+    let base = env::var("MANCUTG_BACKEND_URL")
+        .unwrap_or_else(|_| DEFAULT_BACKEND_BASE_URL.to_owned());
+    format!("{}/events", base.trim_end_matches('/'))
+}
+
+fn resolve_store_path(optional_store_path: Option<&str>) -> Result<PathBuf, String> {
+    match optional_store_path {
+        Some(path) => Ok(PathBuf::from(path)),
+        None => default_store_path(),
+    }
+}
+
 fn default_store_path() -> Result<PathBuf, String> {
     env::current_dir()
         .map(|cwd| cwd.join("mancutg-arenac.sqlite3"))
@@ -493,12 +528,26 @@ pub fn import_ios_logs(
 
 pub fn import_ios_file_at_path(log_path: &str) -> Result<OfflineLogImportSummary, String> {
     let store = open_store(None)?;
-    import_ios_logs(&store, ImportSourceKind::DragAndDrop, vec![PathBuf::from(log_path)])
+    let summary = import_ios_logs(
+        &store,
+        ImportSourceKind::DragAndDrop,
+        vec![PathBuf::from(log_path)],
+    )?;
+    // Enqueue-on-ingest: mirror to the sync outbox when consent is on
+    // (best-effort — a sync-outbox hiccup must never fail the import itself).
+    let _ = enqueue_ingested_events(None, None);
+    Ok(summary)
 }
 
 pub fn import_ios_folder_at_path(directory: &str) -> Result<OfflineLogImportSummary, String> {
     let store = open_store(None)?;
-    import_ios_logs(&store, ImportSourceKind::FolderImport, vec![PathBuf::from(directory)])
+    let summary = import_ios_logs(
+        &store,
+        ImportSourceKind::FolderImport,
+        vec![PathBuf::from(directory)],
+    )?;
+    let _ = enqueue_ingested_events(None, None);
+    Ok(summary)
 }
 
 pub fn inspect_local_store(optional_store_path: Option<&str>) -> Result<LocalStoreSummary, String> {
@@ -564,6 +613,139 @@ pub fn write_export_file(path: &str, contents: &str) -> Result<String, String> {
     fs::write(path, contents)
         .map_err(|error| format!("failed to write export file {path}: {error}"))?;
     Ok(path.to_owned())
+}
+
+/// Converts a stored event into a sync-outbox input. The stable
+/// `event_id` (`"<session_id>:<sequence>"`) makes enqueue idempotent and lets
+/// the backend deduplicate.
+fn event_to_outbox_input(event: &NormalizedEvent) -> core_sync::OutboxEventInput {
+    core_sync::OutboxEventInput {
+        session_id: event.session_id.clone(),
+        sequence: event.sequence,
+        event_type: event.event_type.label().to_owned(),
+        occurred_at: event.timestamp.clone(),
+        payload: event.payload.clone(),
+    }
+}
+
+/// Enqueue-on-ingest hook. When sync consent is on, mirrors the persistent
+/// store's events into the sync outbox (idempotent `INSERT OR IGNORE`), so a
+/// later [`sync_now`] has everything to drain. A no-op when sync is disabled,
+/// so ingest paths are unchanged for offline users. Returns the number of
+/// newly enqueued rows.
+///
+/// Raw log chunks are deliberately never enqueued — only normalized events —
+/// which upholds the "events/normalized only" (rawUploadEnabled off) posture.
+pub fn enqueue_ingested_events(
+    optional_store_path: Option<&str>,
+    optional_settings_path: Option<&str>,
+) -> Result<usize, String> {
+    let settings = load_arena_settings(optional_settings_path)?;
+    if !settings.privacy.sync_enabled {
+        return Ok(0);
+    }
+    let store_path = resolve_store_path(optional_store_path)?;
+    let store = EventStore::open(&store_path)
+        .map_err(|error| format!("failed to open store for outbox enqueue: {error}"))?;
+    let events = store
+        .load_events()
+        .map_err(|error| format!("failed to load events for outbox enqueue: {error}"))?;
+    let outbox = core_sync::Outbox::open(&store_path)
+        .map_err(|error| format!("failed to open sync outbox: {error}"))?;
+    let inputs: Vec<_> = events.iter().map(event_to_outbox_input).collect();
+    outbox
+        .enqueue(&inputs)
+        .map_err(|error| format!("failed to enqueue events for sync: {error}"))
+}
+
+/// Drains the sync outbox to the backend `/events` endpoint, hard-gated on
+/// sync consent.
+///
+/// When `PrivacySettings.sync_enabled` is false this returns immediately with
+/// `attempted: false` and makes **zero** network calls — no HTTP client is
+/// even constructed. When enabled, it first mirrors the store into the outbox
+/// (idempotent) and then drains pending batches with exponential backoff and
+/// one deterministic `idempotencyKey` per batch, so retries never duplicate
+/// server rows. Only normalized events are sent; raw chunks are never uploaded.
+pub fn sync_now(
+    optional_store_path: Option<&str>,
+    optional_settings_path: Option<&str>,
+) -> Result<SyncOutcome, String> {
+    let settings = load_arena_settings(optional_settings_path)?;
+    let backend_url = backend_events_url();
+
+    // Hard consent gate: nothing leaves the device when sync is off.
+    if !settings.privacy.sync_enabled {
+        return Ok(SyncOutcome {
+            sync_enabled: false,
+            attempted: false,
+            batches_sent: 0,
+            events_synced: 0,
+            pending_remaining: 0,
+            backend_url,
+            last_error: None,
+        });
+    }
+
+    let store_path = resolve_store_path(optional_store_path)?;
+    let store = EventStore::open(&store_path)
+        .map_err(|error| format!("failed to open store for sync: {error}"))?;
+    let events = store
+        .load_events()
+        .map_err(|error| format!("failed to load events for sync: {error}"))?;
+    let outbox = core_sync::Outbox::open(&store_path)
+        .map_err(|error| format!("failed to open sync outbox: {error}"))?;
+    let inputs: Vec<_> = events.iter().map(event_to_outbox_input).collect();
+    outbox
+        .enqueue(&inputs)
+        .map_err(|error| format!("failed to enqueue events for sync: {error}"))?;
+
+    let config = core_sync::DrainConfig::default();
+    let report = core_sync::sync_outbox(
+        &outbox,
+        settings.privacy.sync_enabled,
+        |_batch: &core_sync::SyncBatch, body: &str| post_batch_via_http(&backend_url, body),
+        &config,
+    )
+    .map_err(|error| format!("failed to drain sync outbox: {error}"))?;
+
+    let pending_remaining = outbox
+        .pending_count()
+        .map_err(|error| format!("failed to read outbox pending count: {error}"))?;
+
+    Ok(SyncOutcome {
+        sync_enabled: true,
+        attempted: report.attempted,
+        batches_sent: report.batches_sent,
+        events_synced: report.events_synced,
+        pending_remaining,
+        backend_url,
+        last_error: report.last_error,
+    })
+}
+
+/// Posts a serialized batch to the backend `/events` endpoint using a minimal
+/// HTTP client. 5xx / network errors are retryable (the outbox retries with
+/// backoff); 4xx is permanent (a malformed batch is not retried).
+fn post_batch_via_http(url: &str, body: &str) -> core_sync::TransportOutcome {
+    match ureq::post(url)
+        .set("Content-Type", "application/json")
+        .send_string(body)
+    {
+        Ok(_response) => core_sync::TransportOutcome::Success,
+        Err(ureq::Error::Status(code, _response)) => {
+            if code >= 500 {
+                core_sync::TransportOutcome::Retryable(format!("backend returned status {code}"))
+            } else {
+                core_sync::TransportOutcome::Permanent(format!(
+                    "backend rejected batch with status {code}"
+                ))
+            }
+        }
+        Err(ureq::Error::Transport(transport)) => {
+            core_sync::TransportOutcome::Retryable(format!("transport error: {transport}"))
+        }
+    }
 }
 
 pub fn reprocess_session(
@@ -1478,7 +1660,7 @@ pub fn card_db_status(
 }
 
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path] [--follow]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]\n  mancutg-arenac import-card-db <scryfall-bulk.json> [card-db-path]\n  mancutg-arenac card-db-status [card-db-path]\n\nCard database:\n  Download the Scryfall \"Oracle Cards\" bulk data file manually from\n  https://scryfall.com/docs/api/bulk-data and import it with import-card-db.\n  The import runs fully offline (no network calls are ever made) and stores\n  the card database beside the event store as cards.sqlite by default."
+    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path] [--follow]\n  mancutg-arenac sync-now [store-path] [settings-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]\n  mancutg-arenac import-card-db <scryfall-bulk.json> [card-db-path]\n  mancutg-arenac card-db-status [card-db-path]\n\nCard database:\n  Download the Scryfall \"Oracle Cards\" bulk data file manually from\n  https://scryfall.com/docs/api/bulk-data and import it with import-card-db.\n  The import runs fully offline (no network calls are ever made) and stores\n  the card database beside the event store as cards.sqlite by default."
 }
 
 /// Runs `watch-log --follow`: a continuous tail of the Arena log that prints
@@ -1486,13 +1668,19 @@ pub fn cli_usage() -> &'static str {
 /// interrupted (Ctrl-C).
 fn run_watch_log_follow_cli(log_path: &str, store_path: Option<&str>) -> Result<String, String> {
     println!("Following {log_path} (press Ctrl-C to stop)...");
+    let store_path_owned = store_path.map(|path| path.to_owned());
+    let enqueue_store_path = store_path_owned.clone();
     let handle = watch_live_log_follow(
         PathBuf::from(log_path),
-        store_path.map(|path| path.to_owned()),
+        store_path_owned,
         DEFAULT_FOLLOW_POLL_INTERVAL,
-        |summary| match serde_json::to_string(summary) {
-            Ok(json) => println!("{json}"),
-            Err(error) => eprintln!("failed to serialize watch summary: {error}"),
+        move |summary| {
+            // Enqueue-on-ingest when sync consent is on (best-effort).
+            let _ = enqueue_ingested_events(enqueue_store_path.as_deref(), None);
+            match serde_json::to_string(summary) {
+                Ok(json) => println!("{json}"),
+                Err(error) => eprintln!("failed to serialize watch summary: {error}"),
+            }
         },
     )?;
     // Blocks until the follow thread exits; Ctrl-C terminates the process.
@@ -1529,8 +1717,18 @@ pub fn run_cli(args: &[String]) -> Result<String, String> {
                 return run_watch_log_follow_cli(log_path, store_path);
             }
             let result = watch_live_log_once(log_path, store_path)?;
+            // Enqueue-on-ingest when sync consent is on (best-effort).
+            let _ = enqueue_ingested_events(store_path, None);
             serde_json::to_string_pretty(&result)
                 .map_err(|error| format!("failed to serialize watch result: {error}"))
+        }
+        "sync-now" => {
+            let result = sync_now(
+                args.get(1).map(String::as_str),
+                args.get(2).map(String::as_str),
+            )?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize sync outcome: {error}"))
         }
         "inspect-store" => {
             let result = inspect_local_store(args.get(1).map(String::as_str))?;

@@ -18,11 +18,16 @@ core-carddb = { path = "../../../crates/core-carddb" }
 core-gamestate = { path = "../../../crates/core-gamestate" }
 core-parser = { path = "../../../crates/core-parser" }
 core-store = { path = "../../../crates/core-store" }
+core-sync = { path = "../../../crates/core-sync" }
 core-domain = { path = "../../../crates/core-domain" }
 notify = "6"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sha2 = "0.10.9"
+# Minimal HTTP client for the optional sync transport. Default features (TLS,
+# gzip) are disabled: the backend is a local HTTP endpoint, so this keeps the
+# dependency/footprint small and avoids pulling in a TLS stack.
+ureq = { version = "2", default-features = false }
 tauri = { version = "2", features = [], optional = true }
 tauri-plugin-dialog = { version = "2", optional = true }
 

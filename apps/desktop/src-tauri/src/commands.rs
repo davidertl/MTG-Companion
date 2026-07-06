@@ -1,7 +1,7 @@
 use crate::{
     ArenaSettings, BackupBundle, CardDbStatusSummary, DesktopBootstrap, LiveLogWatchSummary,
     LiveWatcherHandle, LocalStoreSummary, MatchAnalysis, MatchInspection, MatchTimeline,
-    OfflineLogImportSummary, WatcherStatus,
+    OfflineLogImportSummary, SyncOutcome, WatcherStatus,
 };
 use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
@@ -81,6 +81,17 @@ pub fn analyze_match(match_id: String) -> Result<MatchAnalysis, String> {
     crate::analyze_match(&match_id, None)
 }
 
+/// Drains the local sync outbox to the backend `/events` endpoint. HARD-GATED
+/// on `PrivacySettings.sync_enabled`: when sync consent is off this makes zero
+/// network calls and returns `attempted: false`. When on, it mirrors the store
+/// into the outbox and drains pending batches with exponential backoff and one
+/// idempotency key per batch (retries never duplicate server rows). Only
+/// normalized events are uploaded — never raw log chunks.
+#[tauri::command]
+pub fn sync_now() -> Result<SyncOutcome, String> {
+    crate::sync_now(None, None)
+}
+
 /// Reports the local card database status (path, whether it has been imported,
 /// total card count and how many carry an Arena id) so the desktop analysis UI
 /// can surface an offline "run import-card-db" guidance state. Read-only: opens
@@ -135,6 +146,9 @@ pub fn start_watcher(
         None,
         crate::DEFAULT_FOLLOW_POLL_INTERVAL,
         move |_summary| {
+            // Enqueue-on-ingest for sync when consent is on (best-effort: a
+            // sync-outbox hiccup must never disrupt live watching).
+            let _ = crate::enqueue_ingested_events(None, None);
             let _ = emit_handle.emit("store-updated", ());
         },
     )?;

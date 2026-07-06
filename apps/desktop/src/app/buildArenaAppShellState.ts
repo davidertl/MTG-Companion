@@ -20,6 +20,7 @@ import type { InventorySummary } from "../routes/inventory/index";
 import type { DraftPickView } from "../routes/draft/index";
 import type { ImportDiagnosticView } from "../routes/diagnostics/index";
 import type { RustCardDbStatus } from "../lib/tauri/commands";
+import type { SyncOutcomeView } from "../routes/settings/index";
 
 export type ArenaShellActions = {
   startWatcherLabel: string;
@@ -48,6 +49,8 @@ export type ArenaAppShellInput = {
   analysisEnabled?: boolean;
   /** Card DB status for the Settings display + analysis empty state. */
   cardDb?: Pick<RustCardDbStatus, "cardDbExists" | "cardCount" | "withArenaIdCount"> | null;
+  /** Result of the last `sync_now` run, for the Settings sync status. */
+  syncOutcome?: SyncOutcomeView | null;
 };
 
 export function buildArenaAppShellState(input: ArenaAppShellInput) {
@@ -108,6 +111,7 @@ export function buildArenaAppShellState(input: ArenaAppShellInput) {
     settings: buildSettingsState(privacy, {
       analysisEnabled: input.analysisEnabled,
       cardDb: input.cardDb,
+      syncOutcome: input.syncOutcome,
     }),
   };
 }

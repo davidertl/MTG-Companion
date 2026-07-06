@@ -18,6 +18,7 @@ fn main() {
                 mancutg_arenac::commands::load_game_timeline,
                 mancutg_arenac::commands::analyze_match,
                 mancutg_arenac::commands::card_db_status,
+                mancutg_arenac::commands::sync_now,
                 mancutg_arenac::commands::write_export_file,
                 mancutg_arenac::commands::start_watcher,
                 mancutg_arenac::commands::stop_watcher,

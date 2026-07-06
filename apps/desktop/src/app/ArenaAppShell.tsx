@@ -350,6 +350,39 @@ export function ArenaAppShell(props: {
                 </span>
               )}
             </div>
+            <div
+              style={{
+                background: "#0d121b",
+                border: "1px solid #24324a",
+                borderRadius: 12,
+                padding: "10px 12px",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <strong style={{ color: "#f7f9fc", fontSize: 13 }}>Backend sync</strong>
+              <span style={{ color: "#b6c5da", fontSize: 13 }}>
+                {state.settings.sync.status.message}
+              </span>
+              <button
+                type="button"
+                disabled={!state.settings.sync.canSyncNow}
+                onClick={() => onAction?.(state.settings.sync.triggerLabel)}
+                aria-label="Sync now"
+                style={{
+                  justifySelf: "start",
+                  background: state.settings.sync.canSyncNow ? "#1c2c46" : "#161c28",
+                  color: state.settings.sync.canSyncNow ? "#dce6f4" : "#5c6b82",
+                  border: "1px solid #2a3a58",
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  cursor: state.settings.sync.canSyncNow ? "pointer" : "not-allowed",
+                }}
+              >
+                {state.settings.sync.triggerLabel}
+              </button>
+            </div>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               <li>Offline capable: {state.settings.offlineCapable ? "Yes" : "No"}</li>
               <li>Settings file: {state.settings.settingsFileName}</li>
