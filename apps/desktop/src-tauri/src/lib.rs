@@ -347,6 +347,17 @@ fn resolve_card_db_path(optional_card_db_path: Option<&str>) -> Result<PathBuf, 
     }
 }
 
+/// Resolves the card database as the `cards.sqlite` sibling of the (possibly
+/// overridden) event store path — the exact layout `import-card-db` produces.
+/// When `optional_store_path` is `None` this equals [`default_card_db_path`],
+/// so a default run and an explicit-store run stay consistent. Used by the
+/// scriptable `analyze-match` CLI so an analysis against a temp store finds its
+/// co-located card DB (the gui `analyze_match` command keeps using the default
+/// path).
+fn card_db_path_for_store(optional_store_path: Option<&str>) -> Result<PathBuf, String> {
+    Ok(resolve_store_path(optional_store_path)?.with_file_name("cards.sqlite"))
+}
+
 /// Best-effort detection of the default MTG Arena `Player.log` location for
 /// the current operating system. Returns `None` on platforms where the
 /// location is unknown (e.g. Linux dev/CI hosts) or when the required
@@ -593,6 +604,33 @@ pub fn analyze_match(
 ) -> Result<MatchAnalysis, String> {
     let store = open_store(optional_store_path)?;
     let card_db_path = default_card_db_path()?;
+    let carddb = if card_db_path.exists() {
+        Some(core_carddb::CardDb::open(&card_db_path).map_err(|error| {
+            format!(
+                "failed to open card database {}: {error}",
+                card_db_path.display()
+            )
+        })?)
+    } else {
+        None
+    };
+    build_match_analysis(&store, match_id, carddb.as_ref())
+}
+
+/// Non-gui, scriptable entry point behind the `analyze-match` CLI subcommand.
+/// Runs the exact same analysis pipeline as the gui [`analyze_match`] command —
+/// both fold the match's stored gameplay events into a timeline and delegate to
+/// the shared [`build_match_analysis`] — but resolves the card DB as the
+/// `cards.sqlite` sibling of the (optionally overridden) store path via
+/// [`card_db_path_for_store`], so a run against a temp store finds its
+/// co-located card DB. Returns the findings for the caller to serialize to
+/// stdout as JSON. Available without the `gui` feature.
+pub fn analyze_match_cli(
+    match_id: &str,
+    optional_store_path: Option<&str>,
+) -> Result<MatchAnalysis, String> {
+    let store = open_store(optional_store_path)?;
+    let card_db_path = card_db_path_for_store(optional_store_path)?;
     let carddb = if card_db_path.exists() {
         Some(core_carddb::CardDb::open(&card_db_path).map_err(|error| {
             format!(
@@ -1660,7 +1698,7 @@ pub fn card_db_status(
 }
 
 pub fn cli_usage() -> &'static str {
-    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path] [--follow]\n  mancutg-arenac sync-now [store-path] [settings-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]\n  mancutg-arenac import-card-db <scryfall-bulk.json> [card-db-path]\n  mancutg-arenac card-db-status [card-db-path]\n\nCard database:\n  Download the Scryfall \"Oracle Cards\" bulk data file manually from\n  https://scryfall.com/docs/api/bulk-data and import it with import-card-db.\n  The import runs fully offline (no network calls are ever made) and stores\n  the card database beside the event store as cards.sqlite by default."
+    "Usage:\n  mancutg-arenac bootstrap <log-path>\n  mancutg-arenac watch-log <log-path> [store-path] [--follow]\n  mancutg-arenac sync-now [store-path] [settings-path]\n  mancutg-arenac inspect-store [store-path]\n  mancutg-arenac reprocess-session <session-id> [store-path]\n  mancutg-arenac analyze-match <match-id> [store-path]\n  mancutg-arenac export-backup [store-path]\n  mancutg-arenac show-settings [settings-path]\n  mancutg-arenac set-consent <updates|sync|telemetry|archidekt> <on|off> [settings-path]\n  mancutg-arenac reset-settings [settings-path]\n  mancutg-arenac wipe-local-data [store-path] [settings-path]\n  mancutg-arenac import-ios-file <log-path> [store-path]\n  mancutg-arenac import-ios-folder <directory> [store-path]\n  mancutg-arenac import-card-db <scryfall-bulk.json> [card-db-path]\n  mancutg-arenac card-db-status [card-db-path]\n\nCard database:\n  Download the Scryfall \"Oracle Cards\" bulk data file manually from\n  https://scryfall.com/docs/api/bulk-data and import it with import-card-db.\n  The import runs fully offline (no network calls are ever made) and stores\n  the card database beside the event store as cards.sqlite by default."
 }
 
 /// Runs `watch-log --follow`: a continuous tail of the Arena log that prints
@@ -1740,6 +1778,12 @@ pub fn run_cli(args: &[String]) -> Result<String, String> {
             let result = reprocess_session(session_id, args.get(2).map(String::as_str))?;
             serde_json::to_string_pretty(&result)
                 .map_err(|error| format!("failed to serialize reprocess summary: {error}"))
+        }
+        "analyze-match" => {
+            let match_id = args.get(1).ok_or_else(|| cli_usage().to_owned())?;
+            let result = analyze_match_cli(match_id, args.get(2).map(String::as_str))?;
+            serde_json::to_string_pretty(&result)
+                .map_err(|error| format!("failed to serialize analysis result: {error}"))
         }
         "export-backup" => {
             let result = export_backup_bundle(args.get(1).map(String::as_str))?;
