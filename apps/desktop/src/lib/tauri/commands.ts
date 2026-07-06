@@ -224,6 +224,19 @@ export type RustMatchAnalysis = {
 export const tauriAnalyzeMatch = (matchId: string) =>
   invoke<RustMatchAnalysis>("analyze_match", { matchId });
 
+// Local card database status (core-carddb). Mirrors `CardDbStatusSummary`
+// (camelCase). `cardDbExists` is false until the offline `import-card-db` CLI
+// has populated the sibling `cards.sqlite`; counts are 0 in that state.
+export type RustCardDbStatus = {
+  cardDbPath: string;
+  cardDbExists: boolean;
+  cardCount: number;
+  withArenaIdCount: number;
+};
+
+export const tauriCardDbStatus = () =>
+  invoke<RustCardDbStatus>("card_db_status");
+
 export const tauriWriteExportFile = (path: string, contents: string) =>
   invoke<string>("write_export_file", { path, contents });
 

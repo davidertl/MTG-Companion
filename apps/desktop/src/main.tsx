@@ -11,9 +11,15 @@ import type { DraftPickView } from "./routes/draft/index";
 import type { ImportDiagnosticView } from "./routes/diagnostics/index";
 import {
   buildMatchDetailState,
+  buildMatchAnalysisState,
   type MatchDetailState,
+  type MatchAnalysisState,
 } from "./routes/history/index";
 import { saveBackupBundle } from "./lib/export/index";
+import {
+  readAnalysisEnabled,
+  writeAnalysisEnabled,
+} from "./lib/settings/analysisPreference";
 import {
   tauriInspectStore,
   tauriShowSettings,
@@ -23,6 +29,9 @@ import {
   tauriImportIosFolder,
   tauriExportBackup,
   tauriInspectMatch,
+  tauriLoadGameTimeline,
+  tauriAnalyzeMatch,
+  tauriCardDbStatus,
   tauriWriteExportFile,
   tauriStartWatcher,
   tauriStopWatcher,
@@ -30,12 +39,15 @@ import {
   type RustLocalStoreSummary,
   type RustArenaSettings,
   type RustWatcherStatus,
+  type RustCardDbStatus,
 } from "./lib/tauri/commands";
 
 function mapStoreToInput(
   store: RustLocalStoreSummary,
   settings: RustArenaSettings,
   watcher: RustWatcherStatus | null,
+  cardDb: RustCardDbStatus | null,
+  analysisEnabled: boolean,
 ): ArenaAppShellInput {
   const matches: MatchHistoryRecord[] = store.matchHistory.map((m) => ({
     matchId: m.match_id,
@@ -95,6 +107,8 @@ function mapStoreToInput(
     draftPicks,
     diagnostics,
     unknownEvents: store.unknownEvents,
+    analysisEnabled,
+    cardDb,
   };
 }
 
@@ -103,21 +117,29 @@ function App() {
     hasDetailedLogs: false,
   });
   const [watcher, setWatcher] = useState<RustWatcherStatus | null>(null);
+  const [cardDb, setCardDb] = useState<RustCardDbStatus | null>(null);
+  const [analysisEnabled, setAnalysisEnabled] = useState<boolean>(() =>
+    readAnalysisEnabled(),
+  );
   const [activeView, setActiveView] = useState<string>("Imports");
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [matchDetail, setMatchDetail] = useState<MatchDetailState | null>(null);
+  const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysisState | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [store, settings, status] = await Promise.all([
+    const [store, settings, status, cards] = await Promise.all([
       tauriInspectStore(),
       tauriShowSettings(),
       tauriWatcherStatus().catch(() => null),
+      tauriCardDbStatus().catch(() => null),
     ]);
     setWatcher(status);
-    setInput(mapStoreToInput(store, settings, status));
+    setCardDb(cards);
+    setInput(mapStoreToInput(store, settings, status, cards, readAnalysisEnabled()));
   }, []);
 
   useEffect(() => {
@@ -142,19 +164,77 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSelectMatch = useCallback(async (matchId: string) => {
-    setSelectedMatchId(matchId);
-    setDetailLoading(true);
-    try {
-      const inspection = await tauriInspectMatch(matchId);
-      setMatchDetail(buildMatchDetailState(inspection.matchId, inspection.events));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setMatchDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
+  const handleSelectMatch = useCallback(
+    async (matchId: string) => {
+      setSelectedMatchId(matchId);
+      setDetailLoading(true);
+      setMatchAnalysis(null);
+      try {
+        const [inspection, timeline, cards] = await Promise.all([
+          tauriInspectMatch(matchId),
+          tauriLoadGameTimeline(matchId).catch(() => null),
+          tauriCardDbStatus().catch(() => cardDb),
+        ]);
+        setMatchDetail(buildMatchDetailState(inspection.matchId, inspection.events));
+        if (timeline) {
+          // Build the analysis view up front with no findings; the user runs
+          // the deterministic engine explicitly via "Run analysis".
+          setMatchAnalysis(
+            buildMatchAnalysisState({
+              matchId: timeline.matchId,
+              timeline: timeline.timeline,
+              findings: [],
+              cardDb: cards,
+              analysisRun: false,
+            }),
+          );
+        }
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setMatchDetail(null);
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [cardDb],
+  );
+
+  const handleRunAnalysis = useCallback(
+    async (matchId: string) => {
+      setAnalysisLoading(true);
+      try {
+        const [analysis, timeline, cards] = await Promise.all([
+          tauriAnalyzeMatch(matchId),
+          tauriLoadGameTimeline(matchId).catch(() => null),
+          tauriCardDbStatus().catch(() => cardDb),
+        ]);
+        setCardDb(cards);
+        if (timeline) {
+          setMatchAnalysis(
+            buildMatchAnalysisState({
+              matchId: analysis.matchId,
+              timeline: timeline.timeline,
+              findings: analysis.findings,
+              cardDb: cards,
+              analysisRun: true,
+            }),
+          );
+        }
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setAnalysisLoading(false);
+      }
+    },
+    [cardDb],
+  );
+
+  const handleToggleAnalysis = useCallback((enabled: boolean) => {
+    writeAnalysisEnabled(enabled);
+    setAnalysisEnabled(enabled);
+    setInput((prev) => ({ ...prev, analysisEnabled: enabled }));
   }, []);
 
   const handleToggleConsent = useCallback(
@@ -287,11 +367,16 @@ function App() {
         onSelectView={setActiveView}
         onAction={handleAction}
         onToggleConsent={handleToggleConsent}
+        onToggleAnalysis={handleToggleAnalysis}
         history={{
           selectedMatchId,
           onSelectMatch: handleSelectMatch,
           detail: matchDetail,
           detailLoading,
+          analysis: matchAnalysis,
+          analysisLoading,
+          analysisEnabled,
+          onRunAnalysis: handleRunAnalysis,
         }}
       />
     </>

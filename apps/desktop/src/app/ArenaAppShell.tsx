@@ -4,7 +4,7 @@ import { SummaryMetric } from "../components/SummaryMetric";
 import { ActionCluster } from "../components/ActionCluster";
 import { MatchList } from "../routes/history/MatchList";
 import { MatchDetail } from "../routes/history/MatchDetail";
-import type { MatchDetailState } from "../routes/history/index";
+import type { MatchAnalysisState, MatchDetailState } from "../routes/history/index";
 import type { ArenaAppShellState } from "./buildArenaAppShellState";
 
 export type ArenaHistoryInteraction = {
@@ -12,6 +12,10 @@ export type ArenaHistoryInteraction = {
   onSelectMatch?: (matchId: string) => void;
   detail?: MatchDetailState | null;
   detailLoading?: boolean;
+  analysis?: MatchAnalysisState | null;
+  analysisLoading?: boolean;
+  analysisEnabled?: boolean;
+  onRunAnalysis?: (matchId: string) => void;
 };
 
 export function ArenaAppShell(props: {
@@ -25,6 +29,7 @@ export function ArenaAppShell(props: {
   onSelectView?: (view: string) => void;
   onAction?: (label: string) => void;
   onToggleConsent?: (purpose: string, enabled: boolean) => void;
+  onToggleAnalysis?: (enabled: boolean) => void;
   history?: ArenaHistoryInteraction;
 }) {
   const {
@@ -33,6 +38,7 @@ export function ArenaAppShell(props: {
     onSelectView,
     onAction,
     onToggleConsent,
+    onToggleAnalysis,
     history,
   } = props;
 
@@ -128,10 +134,18 @@ export function ArenaAppShell(props: {
                 onSelect={history?.onSelectMatch}
               />
             </ShellPanel>
-            <ShellPanel title="Match Detail" subtitle="Per-match event timeline">
+            <ShellPanel title="Match Detail" subtitle="Timeline, findings, and suggestions">
               <MatchDetail
                 state={history?.detail ?? null}
                 loading={history?.detailLoading}
+                analysis={history?.analysis ?? null}
+                analysisLoading={history?.analysisLoading}
+                analysisEnabled={history?.analysisEnabled}
+                onRunAnalysis={
+                  history?.selectedMatchId && history?.onRunAnalysis
+                    ? () => history.onRunAnalysis?.(history.selectedMatchId as string)
+                    : undefined
+                }
               />
             </ShellPanel>
           </div>
@@ -298,6 +312,43 @@ export function ArenaAppShell(props: {
                 state.settings.telemetryEnabled,
               )}
               {consentToggle("archidekt", "Archidekt enabled", state.settings.archidektEnabled)}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  color: "#dce6f4",
+                  fontSize: 14,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={state.settings.analysisEnabled}
+                  onChange={(event) => onToggleAnalysis?.(event.target.checked)}
+                  aria-label="Analysis enabled"
+                />
+                <span>Analysis enabled</span>
+              </label>
+            </div>
+            <div
+              style={{
+                background: "#0d121b",
+                border: "1px solid #24324a",
+                borderRadius: 12,
+                padding: "10px 12px",
+                display: "grid",
+                gap: 4,
+              }}
+            >
+              <strong style={{ color: "#f7f9fc", fontSize: 13 }}>Card database</strong>
+              <span style={{ color: "#b6c5da", fontSize: 13 }}>
+                {state.settings.cardDb.label}
+              </span>
+              {state.settings.cardDb.guidance && (
+                <span style={{ color: "#8ea0bc", fontSize: 12 }}>
+                  {state.settings.cardDb.guidance}
+                </span>
+              )}
             </div>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               <li>Offline capable: {state.settings.offlineCapable ? "Yes" : "No"}</li>

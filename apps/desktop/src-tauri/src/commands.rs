@@ -1,7 +1,7 @@
 use crate::{
-    ArenaSettings, BackupBundle, DesktopBootstrap, LiveLogWatchSummary, LiveWatcherHandle,
-    LocalStoreSummary, MatchAnalysis, MatchInspection, MatchTimeline, OfflineLogImportSummary,
-    WatcherStatus,
+    ArenaSettings, BackupBundle, CardDbStatusSummary, DesktopBootstrap, LiveLogWatchSummary,
+    LiveWatcherHandle, LocalStoreSummary, MatchAnalysis, MatchInspection, MatchTimeline,
+    OfflineLogImportSummary, WatcherStatus,
 };
 use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
@@ -79,6 +79,15 @@ pub fn load_game_timeline(match_id: String) -> Result<MatchTimeline, String> {
 #[tauri::command]
 pub fn analyze_match(match_id: String) -> Result<MatchAnalysis, String> {
     crate::analyze_match(&match_id, None)
+}
+
+/// Reports the local card database status (path, whether it has been imported,
+/// total card count and how many carry an Arena id) so the desktop analysis UI
+/// can surface an offline "run import-card-db" guidance state. Read-only: opens
+/// the sibling `cards.sqlite` when present, never triggers a network download.
+#[tauri::command]
+pub fn card_db_status() -> Result<CardDbStatusSummary, String> {
+    crate::card_db_status(None)
 }
 
 /// Writes already-serialized export contents to a user-chosen path (obtained

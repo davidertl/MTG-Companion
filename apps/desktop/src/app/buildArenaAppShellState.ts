@@ -19,6 +19,7 @@ import type { CollectionSummary } from "../routes/collection/index";
 import type { InventorySummary } from "../routes/inventory/index";
 import type { DraftPickView } from "../routes/draft/index";
 import type { ImportDiagnosticView } from "../routes/diagnostics/index";
+import type { RustCardDbStatus } from "../lib/tauri/commands";
 
 export type ArenaShellActions = {
   startWatcherLabel: string;
@@ -43,6 +44,10 @@ export type ArenaAppShellInput = {
   decks?: DeckSnapshot[];
   diagnostics?: ImportDiagnosticView[];
   unknownEvents?: string[];
+  /** Local analysis toggle (offline feature, persisted client-side). */
+  analysisEnabled?: boolean;
+  /** Card DB status for the Settings display + analysis empty state. */
+  cardDb?: Pick<RustCardDbStatus, "cardDbExists" | "cardCount" | "withArenaIdCount"> | null;
 };
 
 export function buildArenaAppShellState(input: ArenaAppShellInput) {
@@ -100,7 +105,10 @@ export function buildArenaAppShellState(input: ArenaAppShellInput) {
       input.unknownEvents ?? [],
     ),
     privacy: buildPrivacyRouteState(privacy),
-    settings: buildSettingsState(privacy),
+    settings: buildSettingsState(privacy, {
+      analysisEnabled: input.analysisEnabled,
+      cardDb: input.cardDb,
+    }),
   };
 }
 
