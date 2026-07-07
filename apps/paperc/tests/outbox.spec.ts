@@ -103,6 +103,29 @@ describe("PaperC sync outbox", () => {
     expect(calls[1].idempotencyKey).toBe("batch-b");
   });
 
+  it("a rebuilt outbox with a new endpoint flushes the pending queue to the new endpoint", async () => {
+    // Recovery path (App rebuilds the Outbox when the endpoint field changes):
+    // queue while pointed at the default localhost URL, then rebuild against the
+    // real backend sharing the same store. The pending batch must survive and be
+    // POSTed to the NEW endpoint.
+    const { fetchFn, calls } = recordingFetch(() => ({ ok: true, status: 200 }));
+    const store = new MemoryStore();
+
+    const localhost = new Outbox({ endpoint: "http://localhost:8787", fetchFn, store });
+    localhost.enqueue(sampleBatch("batch-recover"));
+    expect(localhost.pendingCount()).toBe(1);
+
+    // Endpoint changed -> a fresh Outbox over the same store reloads the queue.
+    const real = new Outbox({ endpoint: "https://backend.example", fetchFn, store });
+    expect(real.pendingCount()).toBe(1);
+
+    const summary = await real.flush();
+    expect(summary.sent).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://backend.example/events");
+    expect(calls[0].idempotencyKey).toBe("batch-recover");
+  });
+
   it("dedups re-enqueue of a known idempotencyKey", async () => {
     const { fetchFn, calls } = recordingFetch(() => ({ ok: true, status: 200 }));
     const outbox = new Outbox({ endpoint: "http://api.test", fetchFn, store: new MemoryStore() });

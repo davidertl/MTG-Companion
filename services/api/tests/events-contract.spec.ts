@@ -377,4 +377,83 @@ describe("eventsRoute", () => {
       ),
     ).toThrow(/unknown session/);
   });
+
+  function analysisBatch(overrides: {
+    sourceApp: "mancutg-backend" | "mancutg-paperc";
+    kind: "rule-check" | "suggestion";
+  }) {
+    // Use a source-app-appropriate (valid) session so ingest reaches the
+    // event-level analysis contract rather than failing session validation.
+    const paperc = overrides.sourceApp === "mancutg-paperc";
+    const sourceSessionId = paperc ? "paper-session-analysis" : "analysis-session-1";
+    const session = paperc
+      ? papercSession(sourceSessionId)
+      : {
+          sourceSessionId,
+          sourceApp: "mancutg-backend" as const,
+          sourceKind: "backend-process" as const,
+          platform: "service",
+          gameMode: "service" as const,
+          startedAt: "2026-07-06T10:00:00Z",
+        };
+    return {
+      sessions: [session],
+      events: [
+        {
+          eventId: "finding-1",
+          sourceApp: overrides.sourceApp,
+          sourceSessionId,
+          eventType: "analysis.finding.raised",
+          occurredAt: "2026-07-06T10:00:01Z",
+          provenance: [
+            paperc
+              ? { sourceKind: "paper-camera" as const, sourceSessionId, cameraId: "cam-a" }
+              : { sourceKind: "backend-process" as const, sourceSessionId },
+          ],
+          payload: {
+            tournamentId: "tournament-1",
+            findingId: "finding-1",
+            gameKey: "mtg-arena",
+            turnNumber: 3,
+            phase: "combat",
+            kind: overrides.kind,
+            code: "extra-land-drop",
+            severity: "possible-violation",
+            confidence: 0.8,
+            ruleRefs: ["CR 305.2"],
+            description: "possible extra land drop",
+            audience: "referee-only",
+            engineVersion: "test-1",
+          },
+        },
+      ],
+    };
+  }
+
+  it("rejects analysis.* events emitted by a disallowed source app (mancutg-paperc)", () => {
+    const store = createInMemoryEventStore();
+    expect(() =>
+      eventsRoute(analysisBatch({ sourceApp: "mancutg-paperc", kind: "rule-check" }), store),
+    ).toThrow(/not allowed to emit/);
+    expect(store.events).toHaveLength(0);
+  });
+
+  it("rejects an analysis.finding.raised payload whose kind is not rule-check", () => {
+    const store = createInMemoryEventStore();
+    expect(() =>
+      eventsRoute(analysisBatch({ sourceApp: "mancutg-backend", kind: "suggestion" }), store),
+    ).toThrow();
+    expect(store.events).toHaveLength(0);
+  });
+
+  it("accepts a well-formed analysis.finding.raised from an allowed emitter and keeps tournamentId", () => {
+    const store = createInMemoryEventStore();
+    const result = eventsRoute(
+      analysisBatch({ sourceApp: "mancutg-backend", kind: "rule-check" }),
+      store,
+    );
+    expect(result.acceptedEventCount).toBe(1);
+    // tournamentId must survive ingest so the findings API can scope by it.
+    expect(store.events[0]?.payload).toMatchObject({ tournamentId: "tournament-1" });
+  });
 });

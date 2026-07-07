@@ -159,11 +159,18 @@ export function App() {
   const [endpoint, setEndpoint] = useState("http://localhost:8787");
 
   const outboxRef = useRef<Outbox | null>(null);
+  const outboxEndpointRef = useRef<string | null>(null);
   const nextSeqRef = useRef(0);
 
   const getOutbox = useCallback(() => {
-    if (!outboxRef.current) {
+    // Rebuild the outbox when the endpoint changes so that editing "Backend
+    // endpoint" takes effect on later flushes. The outbox reloads its pending
+    // queue from the shared store on construction and persists on every change,
+    // so no queued batches are lost across the rebuild (recovery path: queue
+    // against localhost, point at the real backend, flush there).
+    if (!outboxRef.current || outboxEndpointRef.current !== endpoint) {
       outboxRef.current = new Outbox({ endpoint, fetchFn: browserFetch, store });
+      outboxEndpointRef.current = endpoint;
     }
     return outboxRef.current;
   }, [endpoint]);

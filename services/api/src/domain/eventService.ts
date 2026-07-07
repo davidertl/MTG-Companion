@@ -2,6 +2,7 @@ import {
   backendEventBatchEnvelopeSchema,
   backendEventEnvelopeSchema,
   backendEventSessionSchema,
+  validateAnalysisEventContract,
   type BackendEventBatchEnvelope,
   type BackendEventEnvelope,
   type BackendEventSession,
@@ -67,9 +68,17 @@ export function applyBackendEventBatch(
     const acceptedEvents: BackendEventEnvelope[] = [];
 
     for (const event of batch.events) {
+      // Enforce both the PaperC and analysis contracts on ingest. The analysis
+      // validator restricts which apps may emit findings and pins the payload
+      // shape; it is called for that throw-on-violation side effect only. We
+      // keep the paperc-validated event (with its full payload) rather than the
+      // validator's return value, because the analysis payload schema strips
+      // unknown keys — including `tournamentId`, which the store needs to scope
+      // findings to a tournament.
       const validatedEvent = validatePapercEventContract(
         backendEventEnvelopeSchema.parse(event),
       );
+      validateAnalysisEventContract(validatedEvent);
       if (!store.hasSession(validatedEvent.sourceApp, validatedEvent.sourceSessionId)) {
         throw new Error(
           `unknown session ${validatedEvent.sourceSessionId} for source app ${validatedEvent.sourceApp}`,
