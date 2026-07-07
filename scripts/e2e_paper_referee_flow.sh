@@ -233,6 +233,24 @@ if want in ids:
 print("player feed clean (visible findings: %d)" % len(ids))
 ' || fail "referee-only finding leaked to player (RELEASE-BLOCKING)"
 
+# 6c) RELEASE-BLOCKING: the anonymous GET /events pull feed must NOT expose the
+#     referee-only finding either (no bearer token, tournament-targeted).
+echo "-- anonymous /events pull (RELEASE-BLOCKING: must NOT contain finding) --"
+PULL_FEED="$(api GET "/events?tournamentId=$TOURNAMENT_ID&limit=500" "")"
+PULL_STATUS="$(status_of "$PULL_FEED")"
+[[ "$PULL_STATUS" == "200" ]] || fail "anonymous /events pull expected 200, got $PULL_STATUS"
+printf '%s' "$(body_of "$PULL_FEED")" | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+want = "'"$FINDING_ID"'"
+types = [e.get("eventType") for e in d.get("events", [])]
+ids = [e.get("eventId") for e in d.get("events", [])]
+if want in ids or any(t and t.startswith("analysis.") for t in types):
+    print("RELEASE-BLOCKING FAILURE: analysis finding LEAKED via anonymous /events pull; types=%r" % (types,), file=sys.stderr)
+    sys.exit(1)
+print("anonymous pull clean (no analysis.* events exposed; %d events)" % len(types))
+' || fail "referee-only finding leaked via anonymous /events pull (RELEASE-BLOCKING)"
+
 echo
 echo "PASS: Paper/referee visibility E2E flow"
 echo "      referee-only finding visible to referee, absent from player (release-blocking check green)"

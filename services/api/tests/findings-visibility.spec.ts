@@ -4,6 +4,7 @@ import {
   createInMemoryEventStore,
   createSqliteStore,
   isFindingVisible,
+  resolveStore,
   startApiServer,
   type BackendStoreLike,
   type StartedApiServer,
@@ -199,7 +200,8 @@ async function getFindings(baseUrl: string, tournamentId: string, token: string)
 
 describe.each(storeFactories)("findings visibility API ($name store)", ({ make }) => {
   async function bootstrap(mode: Mode) {
-    const server = await startApiServer(0, { eventStore: make(), allowRegistration: true });
+    const store = make();
+    const server = await startApiServer(0, { eventStore: store, allowRegistration: true });
     servers.push(server);
     const base = server.baseUrl;
 
@@ -213,7 +215,19 @@ describe.each(storeFactories)("findings visibility API ($name store)", ({ make }
     await addMember(base, organizer.token, tournamentId, player.userId, "player");
     await addMember(base, organizer.token, tournamentId, spectator.userId, "spectator");
 
-    return { base, tournamentId, organizer, referee, player, spectator };
+    return { base, store, tournamentId, organizer, referee, player, spectator };
+  }
+
+  /**
+   * Count reviewed events on the append-only stream by reading the store
+   * directly. Analysis events are intentionally NOT exposed through the
+   * anonymous `GET /events` pull feed (referee-only visibility), so tests must
+   * inspect the store rather than pull them over HTTP.
+   */
+  function countReviewedEvents(store: BackendStoreLike, tournamentId: string): number {
+    return resolveStore(store)
+      .readEventsAfter(0, 1000, tournamentId)
+      .filter((entry) => entry.event.eventType === "analysis.finding.reviewed").length;
   }
 
   it("referee sees a referee-only finding", async () => {
@@ -269,7 +283,7 @@ describe.each(storeFactories)("findings visibility API ($name store)", ({ make }
   });
 
   it("review transition emits an analysis.finding.reviewed event and is idempotent", async () => {
-    const { base, tournamentId, referee } = await bootstrap("referee-only");
+    const { base, store, tournamentId, referee } = await bootstrap("referee-only");
     await postFinding(base, tournamentId, "f-review", "referee-only");
 
     const first = await fetch(
@@ -294,15 +308,9 @@ describe.each(storeFactories)("findings visibility API ($name store)", ({ make }
     const reviewed = afterBody.findings.find((entry) => entry.finding.findingId === "f-review");
     expect(reviewed?.review?.resolution).toBe("confirmed");
 
-    // A reviewed event exists on the append-only stream.
-    const pull = await fetch(`${base}/events?tournamentId=${tournamentId}&limit=500`);
-    const pullBody = (await pull.json()) as {
-      events: Array<{ eventType: string }>;
-    };
-    const reviewedEvents = pullBody.events.filter(
-      (event) => event.eventType === "analysis.finding.reviewed",
-    );
-    expect(reviewedEvents).toHaveLength(1);
+    // A reviewed event exists on the append-only stream (read via the store —
+    // analysis events are not exposed through the anonymous pull feed).
+    expect(countReviewedEvents(store, tournamentId)).toBe(1);
 
     // Idempotent: re-posting the same resolution adds no new event.
     const second = await fetch(
@@ -316,13 +324,7 @@ describe.each(storeFactories)("findings visibility API ($name store)", ({ make }
     expect(second.status).toBe(200);
     await expect(second.json()).resolves.toMatchObject({ duplicate: true });
 
-    const pullAgain = await fetch(`${base}/events?tournamentId=${tournamentId}&limit=500`);
-    const pullAgainBody = (await pullAgain.json()) as {
-      events: Array<{ eventType: string }>;
-    };
-    expect(
-      pullAgainBody.events.filter((event) => event.eventType === "analysis.finding.reviewed"),
-    ).toHaveLength(1);
+    expect(countReviewedEvents(store, tournamentId)).toBe(1);
   });
 
   it("forbids a player from reviewing a finding (403)", async () => {

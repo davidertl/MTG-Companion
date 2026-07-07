@@ -24,8 +24,16 @@
 //! - Entered-this-turn detection matches by card name, so it needs the entering
 //!   `ZoneTransfer` and the attacker declaration to carry names; instance-only
 //!   Arena identity is not correlated here (false negative).
+//! - Because instance identity is not preserved at the action level, a name can
+//!   be ambiguous when several copies of a creature are in play. To avoid
+//!   FALSE POSITIVES on a legal attack with an older copy (e.g. attacking with a
+//!   turn-1 Llanowar Elves while a second copy entered this turn), the check
+//!   fires only when *every* same-named creature the attacker controls entered
+//!   this turn — so the specific attacker provably lacked the control since its
+//!   most recent turn began. When an older same-named copy could be the
+//!   attacker, the check stays silent (false negative, per the plan's bias).
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use core_domain::{GameAction, Zone};
 use core_carddb::CardRecord;
@@ -58,7 +66,17 @@ pub(crate) fn check(ctx: &CheckContext<'_>) -> Vec<Finding> {
                 let Some(name) = &card_ref.name else {
                     continue;
                 };
-                if !entered.contains(&name.to_lowercase()) {
+                let lowered = name.to_lowercase();
+                let entered_count = entered.get(&lowered).copied().unwrap_or(0);
+                if entered_count == 0 {
+                    continue;
+                }
+                // Ambiguity guard: if the attacker controls more same-named
+                // creatures than entered this turn, an older (legal) copy could
+                // be the one attacking. We cannot disambiguate by instance at
+                // the action level, so stay silent rather than risk a false
+                // positive on a legal attack.
+                if battlefield_name_count(turn, &lowered) > entered_count {
                     continue;
                 }
                 let Some(record) = resolve_card(ctx.carddb, card_ref) else {
@@ -88,9 +106,10 @@ pub(crate) fn check(ctx: &CheckContext<'_>) -> Vec<Finding> {
     findings
 }
 
-/// Names of creatures that entered the battlefield during this turn, lowercased.
-fn entered_this_turn(turn: &TurnSnapshot) -> BTreeSet<String> {
-    let mut entered = BTreeSet::new();
+/// Count of creatures that entered the battlefield during this turn, keyed by
+/// lowercased card name.
+fn entered_this_turn(turn: &TurnSnapshot) -> BTreeMap<String, usize> {
+    let mut entered: BTreeMap<String, usize> = BTreeMap::new();
     for timeline_action in &turn.actions {
         if let TimelineAction::Parsed(GameAction::ZoneTransfer {
             card_ref: Some(card_ref),
@@ -99,11 +118,29 @@ fn entered_this_turn(turn: &TurnSnapshot) -> BTreeSet<String> {
         }) = timeline_action
         {
             if let Some(name) = &card_ref.name {
-                entered.insert(name.to_lowercase());
+                *entered.entry(name.to_lowercase()).or_default() += 1;
             }
         }
     }
     entered
+}
+
+/// How many battlefield objects (across all players) carry the given lowercased
+/// name at the end of this turn. Used to detect same-name ambiguity so a legal
+/// attack with an older copy is never flagged.
+fn battlefield_name_count(turn: &TurnSnapshot, lowered_name: &str) -> usize {
+    turn.zones
+        .values()
+        .flat_map(|zones| zones.battlefield.iter())
+        .filter(|object| {
+            object
+                .card_ref
+                .name
+                .as_deref()
+                .map(|name| name.to_lowercase() == lowered_name)
+                .unwrap_or(false)
+        })
+        .count()
 }
 
 fn has_haste(record: &CardRecord) -> bool {

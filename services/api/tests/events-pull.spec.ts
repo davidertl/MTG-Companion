@@ -177,6 +177,55 @@ describe("eventsPullRoute", () => {
         expect(() => eventsPullRoute({ cursor: "-1" }, store)).toThrow();
         expect(() => eventsPullRoute({ limit: "0" }, store)).toThrow();
       });
+
+      it("never returns referee-only analysis findings through the anonymous pull feed", () => {
+        const store = makeStore();
+        eventsRoute(
+          {
+            sessions: [arenaSession("arena-session-secret")],
+            events: [
+              arenaEvent("arena-session-secret", "normal-1", {
+                tournamentId: "tour-secret",
+              }),
+              {
+                eventId: "finding-secret-1",
+                sourceApp: "mancutg-arenac" as const,
+                sourceSessionId: "arena-session-secret",
+                eventType: "analysis.finding.raised",
+                occurredAt: "2026-05-06T22:55:00Z",
+                provenance: [
+                  {
+                    sourceKind: "arena-log" as const,
+                    sourceSessionId: "arena-session-secret",
+                  },
+                ],
+                payload: {
+                  tournamentId: "tour-secret",
+                  audience: "referee-only",
+                  description: "possible missed trigger",
+                  ruleRefs: ["603.2"],
+                },
+              },
+            ],
+          },
+          store,
+        );
+
+        // Both an unscoped pull and a tournament-targeted pull must omit the
+        // finding entirely (the whole point of referee-only visibility), while
+        // still returning ordinary events.
+        for (const query of [{}, { tournamentId: "tour-secret" }]) {
+          const result = eventsPullRoute(query, store);
+          const eventIds = result.events.map((event) => event.eventId);
+          expect(eventIds).toContain("normal-1");
+          expect(eventIds).not.toContain("finding-secret-1");
+          expect(
+            result.events.some((event) =>
+              event.eventType.startsWith("analysis."),
+            ),
+          ).toBe(false);
+        }
+      });
     });
   }
 
