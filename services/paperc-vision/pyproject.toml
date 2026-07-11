@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mancutg-paperc-vision"
+version = "0.0.1"
+description = "Clean-room, offline card identification prototype for MancuTG-PaperC (perceptual-hash matching against a Scryfall-derived index)."
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "pillow>=10",
+]
+
+[project.optional-dependencies]
+# OpenCV is only needed for detecting card quads in a full camera photo.
+# The fingerprint / index / observation core works with Pillow alone.
+camera = ["opencv-python>=4.9", "numpy>=1.26"]
+
+[project.scripts]
+paperc-vision = "paperc_vision.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
