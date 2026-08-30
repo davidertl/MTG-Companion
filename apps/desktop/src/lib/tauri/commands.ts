@@ -116,3 +116,160 @@ export const tauriImportIosFolder = (directory: string) =>
 
 export const tauriExportBackup = () =>
   invoke<RustBackupBundle>("export_backup");
+
+export type RustMatchEventSummary = {
+  sessionId: string;
+  sequence: number;
+  timestamp: string;
+  eventType: string;
+  payloadJson: string;
+};
+
+export type RustMatchInspection = {
+  matchId: string;
+  events: RustMatchEventSummary[];
+};
+
+export const tauriInspectMatch = (matchId: string) =>
+  invoke<RustMatchInspection>("inspect_match", { matchId });
+
+// Reconstructed per-turn game timeline (core-gamestate). Zone/action shapes are
+// intentionally loose here — the desktop timeline view treats them structurally;
+// core-domain field casing (snake_case) is preserved verbatim.
+export type RustCardRef = {
+  name?: string;
+  arenaId?: number;
+  scryfallOracleId?: string;
+};
+
+export type RustObjectState = {
+  instanceId?: number;
+  cardRef: RustCardRef;
+  controller?: string;
+  tapped: boolean;
+  counters?: Record<string, number>;
+};
+
+export type RustPlayerZones = {
+  battlefield: RustObjectState[];
+  graveyard: RustObjectState[];
+  exile: RustObjectState[];
+  handCount: number;
+  libraryCount: number;
+};
+
+export type RustTimelineAction =
+  | { source: "parsed"; [key: string]: unknown }
+  | {
+      source: "raw";
+      eventType: string;
+      sequence: number;
+      payload: unknown;
+      note: string;
+    };
+
+export type RustTurnSnapshot = {
+  turnNumber: number;
+  activePlayer?: string;
+  phase?: string;
+  step?: string;
+  zones: Record<string, RustPlayerZones>;
+  lifeTotals: Record<string, number>;
+  actions: RustTimelineAction[];
+};
+
+export type RustCompleteness =
+  | { kind: "complete" }
+  | { kind: "partial"; reason: string };
+
+export type RustGameTimeline = {
+  turns: RustTurnSnapshot[];
+  completeness: RustCompleteness;
+  notes: string[];
+};
+
+export type RustMatchTimeline = {
+  matchId: string;
+  timeline: RustGameTimeline;
+};
+
+export const tauriLoadGameTimeline = (matchId: string) =>
+  invoke<RustMatchTimeline>("load_game_timeline", { matchId });
+
+// Analysis findings (core-analysis). Mirrors the frozen analysisFindingSchema
+// field-for-field (camelCase); kind/severity/audience are the schema's string
+// unions, code is an open string.
+export type RustFinding = {
+  findingId: string;
+  gameKey: string;
+  turnNumber: number;
+  phase: string;
+  kind: "rule-check" | "suggestion";
+  code: string;
+  severity: "info" | "warning" | "possible-violation";
+  confidence: number;
+  ruleRefs: string[];
+  description: string;
+  audience: "players" | "referee-only" | "all";
+  engineVersion: string;
+};
+
+export type RustMatchAnalysis = {
+  matchId: string;
+  cardDbAvailable: boolean;
+  persistedEvents: number;
+  findings: RustFinding[];
+};
+
+export const tauriAnalyzeMatch = (matchId: string) =>
+  invoke<RustMatchAnalysis>("analyze_match", { matchId });
+
+// Local card database status (core-carddb). Mirrors `CardDbStatusSummary`
+// (camelCase). `cardDbExists` is false until the offline `import-card-db` CLI
+// has populated the sibling `cards.sqlite`; counts are 0 in that state.
+export type RustCardDbStatus = {
+  cardDbPath: string;
+  cardDbExists: boolean;
+  cardCount: number;
+  withArenaIdCount: number;
+};
+
+export const tauriCardDbStatus = () =>
+  invoke<RustCardDbStatus>("card_db_status");
+
+export const tauriWriteExportFile = (path: string, contents: string) =>
+  invoke<string>("write_export_file", { path, contents });
+
+// Desktop sync transport (W4.3). Mirrors `SyncOutcome` (camelCase). `attempted`
+// is false and every counter zero when sync consent is off — the hard gate that
+// guarantees zero network calls for unconsented users.
+export type RustSyncOutcome = {
+  syncEnabled: boolean;
+  attempted: boolean;
+  batchesSent: number;
+  eventsSynced: number;
+  pendingRemaining: number;
+  backendUrl: string;
+  lastError: string | null;
+};
+
+export const tauriSyncNow = () => invoke<RustSyncOutcome>("sync_now");
+
+export type RustWatcherStatus = {
+  running: boolean;
+  logPath: string | null;
+  defaultLogPath: string | null;
+  ingestCount: number;
+  totalInsertedEvents: number;
+  totalInsertedRawChunks: number;
+  lastError: string | null;
+};
+
+export const tauriStartWatcher = (logPath?: string) =>
+  invoke<RustWatcherStatus>("start_watcher", { logPath: logPath ?? null });
+
+export const tauriStopWatcher = () =>
+  invoke<RustWatcherStatus>("stop_watcher");
+
+export const tauriWatcherStatus = () =>
+  invoke<RustWatcherStatus>("watcher_status");

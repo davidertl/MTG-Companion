@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm test *)",
-      "Bash(git -C /Users/davidertl/Documents/GitHub/MTG-Companion log --all --oneline --grep=\"Tauri\\\\|desktop\\\\|gui\" -i)"
+      "Bash(git -C /Users/davidertl/Documents/GitHub/MTG-Companion log --all --oneline --grep=\"Tauri\\\\|desktop\\\\|gui\" -i)",
+      "mcp__Claude_Code_Remote__send_later"
     ]
   }
 }

@@ -2,7 +2,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { URL } from "node:url";
 import { ZodError } from "zod";
 
-import { createInMemoryEventStore, type EventStore } from "./domain/eventService.ts";
+import {
+  createInMemoryEventStore,
+  resolveStore,
+  type BackendStoreLike,
+} from "./domain/eventService.ts";
 import { createInMemorySyncStore, type SyncStore } from "./domain/syncService.ts";
 import { mediaSessionsRoute } from "./routes/media/index.ts";
 import {
@@ -12,12 +16,41 @@ import {
   type ArchidektFetcher,
 } from "./routes/integrations/archidekt/import.ts";
 import { eventsRoute } from "./routes/events.ts";
+import { eventsPullRoute } from "./routes/eventsPull.ts";
 import { syncRoute } from "./routes/sync.ts";
+import { AuthError, UnauthorizedError } from "./auth/roles.ts";
+import {
+  parseBearerToken,
+  registerUser,
+  resolveUserFromToken,
+  type AuthenticatedUser,
+} from "./auth/tokens.ts";
+import {
+  addTournamentMemberRoute,
+  createTournamentRoute,
+  getMyRoleRoute,
+} from "./routes/tournaments/index.ts";
+import {
+  listFindingsRoute,
+  reviewFindingRoute,
+} from "./routes/tournaments/findings.ts";
+import type { Store } from "./store/types.ts";
 
 export interface ApiServerOptions {
   store?: SyncStore;
-  eventStore?: EventStore;
+  eventStore?: BackendStoreLike;
   archidektFetcher?: ArchidektFetcher;
+  /**
+   * Enables `POST /auth/register`. Defaults to the `MANCUTG_ALLOW_REGISTRATION`
+   * env var (any of `1`/`true`/`yes`/`on`). Registration is off by default so a
+   * default backend deployment does not silently mint accounts.
+   */
+  allowRegistration?: boolean;
+}
+
+function registrationEnabledFromEnv(): boolean {
+  const value = (process.env.MANCUTG_ALLOW_REGISTRATION ?? "").trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 
 export interface StartedApiServer {
@@ -30,6 +63,11 @@ export interface StartedApiServer {
 export function createApiServer(options: ApiServerOptions = {}): Server {
   const store = options.store ?? createInMemorySyncStore();
   const eventStore = options.eventStore ?? createInMemoryEventStore();
+  // Auth/identity data lives in the same backend as events/media. Resolve it
+  // once to the Store interface (a legacy JSON bag is wrapped in an adapter over
+  // the shared bag, so all routes observe the same data).
+  const authStore: Store = resolveStore(eventStore);
+  const allowRegistration = options.allowRegistration ?? registrationEnabledFromEnv();
   const importDeck = buildArchidektImportRoute(
     options.archidektFetcher ?? buildRuntimeArchidektFetcher(),
   );
@@ -53,6 +91,18 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
         return sendJson(response, 200, result);
       }
 
+      if (method === "GET" && url.pathname === "/events") {
+        const result = eventsPullRoute(
+          {
+            cursor: url.searchParams.get("cursor") ?? undefined,
+            limit: url.searchParams.get("limit") ?? undefined,
+            tournamentId: url.searchParams.get("tournamentId") ?? undefined,
+          },
+          eventStore,
+        );
+        return sendJson(response, 200, result);
+      }
+
       if (method === "POST" && url.pathname === "/events") {
         const body = await readJsonBody(request);
         const result = eventsRoute(body, eventStore);
@@ -71,10 +121,83 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
         return sendJson(response, 200, snapshot);
       }
 
+      // --- Auth + tournament-scoped routes (W2.3) ----------------------------
+      // These are the ONLY routes that require authentication. Everything above
+      // stays anonymous (offline-first: desktop sync without an account works).
+
+      if (method === "POST" && url.pathname === "/auth/register") {
+        if (!allowRegistration) {
+          return sendJson(response, 403, { error: "registration-disabled" });
+        }
+        const body = (await readJsonBody(request)) as { displayName?: unknown } | null;
+        const displayName =
+          typeof body?.displayName === "string" ? body.displayName.trim() : "";
+        if (displayName.length === 0) {
+          return sendJson(response, 400, { error: "invalid-request" });
+        }
+        const result = registerUser(authStore, displayName);
+        return sendJson(response, 201, result);
+      }
+
+      const segments = url.pathname.split("/").filter((segment) => segment.length > 0);
+
+      if (segments[0] === "tournaments") {
+        const user = requireAuthenticatedUser(authStore, request);
+
+        if (method === "POST" && segments.length === 1) {
+          const body = await readJsonBody(request);
+          return sendJson(response, 201, createTournamentRoute(authStore, user, body));
+        }
+
+        if (segments.length === 3) {
+          const tournamentId = decodeURIComponent(segments[1]);
+
+          if (method === "POST" && segments[2] === "members") {
+            const body = await readJsonBody(request);
+            return sendJson(
+              response,
+              201,
+              addTournamentMemberRoute(authStore, user, tournamentId, body),
+            );
+          }
+
+          if (method === "GET" && segments[2] === "role") {
+            return sendJson(response, 200, getMyRoleRoute(authStore, user, tournamentId));
+          }
+
+          if (method === "GET" && segments[2] === "findings") {
+            return sendJson(response, 200, listFindingsRoute(authStore, user, tournamentId));
+          }
+        }
+
+        // POST /tournaments/:id/findings/:findingId/review
+        if (
+          segments.length === 5 &&
+          method === "POST" &&
+          segments[2] === "findings" &&
+          segments[4] === "review"
+        ) {
+          const tournamentId = decodeURIComponent(segments[1]);
+          const findingId = decodeURIComponent(segments[3]);
+          const body = await readJsonBody(request);
+          return sendJson(
+            response,
+            200,
+            reviewFindingRoute(authStore, user, tournamentId, findingId, body),
+          );
+        }
+
+        return sendJson(response, 404, { error: "not-found" });
+      }
+
       return sendJson(response, 404, { error: "not-found" });
     } catch (error) {
       if (error instanceof ZodError) {
         return sendJson(response, 400, { error: "invalid-request" });
+      }
+
+      if (error instanceof AuthError) {
+        return sendJson(response, error.status, { error: error.code });
       }
 
       if (error instanceof ArchidektImportRouteError) {
@@ -121,6 +244,15 @@ export async function startApiServer(
         });
       }),
   };
+}
+
+function requireAuthenticatedUser(store: Store, request: IncomingMessage): AuthenticatedUser {
+  const token = parseBearerToken(request.headers.authorization);
+  const user = resolveUserFromToken(store, token);
+  if (!user) {
+    throw new UnauthorizedError();
+  }
+  return user;
 }
 
 function sendJson(response: ServerResponse, status: number, payload: unknown): void {

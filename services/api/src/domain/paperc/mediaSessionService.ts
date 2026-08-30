@@ -3,7 +3,7 @@ import {
   mediaIngestRequestSchema,
   type MediaArtifact,
 } from "../../../../../packages/shared-schema/src/index.ts";
-import { upsertMediaState, type EventStore } from "../eventService.ts";
+import { upsertMediaState, type BackendStoreLike } from "../eventService.ts";
 
 export interface MediaIngestResult {
   captureSessionId: string;
@@ -17,7 +17,7 @@ export interface MediaIngestResult {
 }
 
 export function ingestMediaSession(
-  store: EventStore,
+  store: BackendStoreLike,
   input: unknown,
 ): MediaIngestResult {
   const payload = mediaIngestRequestSchema.parse(input);

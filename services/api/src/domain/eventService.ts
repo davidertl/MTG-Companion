@@ -1,11 +1,8 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-
 import {
   backendEventBatchEnvelopeSchema,
   backendEventEnvelopeSchema,
   backendEventSessionSchema,
-  mediaArtifactSchema,
-  mediaCaptureSessionSchema,
+  validateAnalysisEventContract,
   type BackendEventBatchEnvelope,
   type BackendEventEnvelope,
   type BackendEventSession,
@@ -17,24 +14,16 @@ import {
   validatePapercSessionContract,
 } from "../../../../packages/shared-schema/src/paperc.ts";
 
-type PersistedStoreFile = {
-  sessions: BackendEventSession[];
-  events: BackendEventEnvelope[];
-  seenBatchKeys: string[];
-  mediaSessions: MediaCaptureSession[];
-  mediaArtifacts: MediaArtifact[];
-  seenMediaBatchKeys: string[];
-};
+import {
+  createInMemoryEventStore,
+  createPersistentEventStore,
+  resolveStore,
+  type BackendStoreLike,
+  type EventStore,
+} from "../store/jsonStore.ts";
 
-export interface EventStore {
-  filePath?: string;
-  sessions: BackendEventSession[];
-  events: BackendEventEnvelope[];
-  seenBatchKeys: string[];
-  mediaSessions: MediaCaptureSession[];
-  mediaArtifacts: MediaArtifact[];
-  seenMediaBatchKeys: string[];
-}
+export { createInMemoryEventStore, createPersistentEventStore, resolveStore };
+export type { BackendStoreLike, EventStore };
 
 export interface EventApplyResult {
   acceptedSessions: BackendEventSession[];
@@ -45,114 +34,89 @@ export interface EventApplyResult {
   totalStoredEvents: number;
 }
 
-export function createInMemoryEventStore(): EventStore {
-  return {
-    filePath: undefined,
-    sessions: [],
-    events: [],
-    seenBatchKeys: [],
-    mediaSessions: [],
-    mediaArtifacts: [],
-    seenMediaBatchKeys: [],
-  };
-}
-
-export function createPersistentEventStore(filePath: string): EventStore {
-  if (!existsSync(filePath)) {
-    return {
-      ...createInMemoryEventStore(),
-      filePath,
-    };
-  }
-
-  const raw = readFileSync(filePath, "utf8");
-  const parsed = parsePersistedStore(JSON.parse(raw));
-  return {
-    filePath,
-    ...parsed,
-  };
-}
-
 export function applyBackendEventBatch(
-  store: EventStore,
+  storeLike: BackendStoreLike,
   input: unknown,
 ): EventApplyResult {
+  const store = resolveStore(storeLike);
   const batch = backendEventBatchEnvelopeSchema.parse(input);
 
-  if (batch.idempotencyKey && store.seenBatchKeys.includes(batch.idempotencyKey)) {
+  if (batch.idempotencyKey && store.hasSeenBatchKey("events", batch.idempotencyKey)) {
     return {
       acceptedSessions: [],
       acceptedEvents: [],
       deduplicatedCount: batch.events.length,
       duplicateBatch: true,
-      totalStoredSessions: store.sessions.length,
-      totalStoredEvents: store.events.length,
+      totalStoredSessions: store.countSessions(),
+      totalStoredEvents: store.countEvents(),
     };
   }
 
-  const sessionMap = new Map(
-    store.sessions.map((session) => [sessionKey(session.sourceApp, session.sourceSessionId), session]),
-  );
-  const acceptedSessions: BackendEventSession[] = [];
-  for (const session of batch.sessions) {
-    const validatedSession = validatePapercSessionContract(
-      backendEventSessionSchema.parse(session),
-    );
-    const key = sessionKey(validatedSession.sourceApp, validatedSession.sourceSessionId);
-    if (!sessionMap.has(key)) {
-      acceptedSessions.push(validatedSession);
-    }
-    sessionMap.set(key, validatedSession);
-  }
-
-  const eventMap = new Map(
-    store.events.map((event) => [eventKey(event), event]),
-  );
-  let deduplicatedCount = 0;
-  const acceptedEvents: BackendEventEnvelope[] = [];
-
-  for (const event of batch.events) {
-    const validatedEvent = validatePapercEventContract(
-      backendEventEnvelopeSchema.parse(event),
-    );
-    const sessionIdentity = sessionKey(validatedEvent.sourceApp, validatedEvent.sourceSessionId);
-    if (!sessionMap.has(sessionIdentity)) {
-      throw new Error(
-        `unknown session ${validatedEvent.sourceSessionId} for source app ${validatedEvent.sourceApp}`,
+  return store.transaction(() => {
+    const acceptedSessions: BackendEventSession[] = [];
+    for (const session of batch.sessions) {
+      const validatedSession = validatePapercSessionContract(
+        backendEventSessionSchema.parse(session),
       );
+      if (!store.hasSession(validatedSession.sourceApp, validatedSession.sourceSessionId)) {
+        acceptedSessions.push(validatedSession);
+      }
+      store.upsertSession(validatedSession);
     }
 
-    const key = eventKey(validatedEvent);
-    if (eventMap.has(key)) {
-      deduplicatedCount += 1;
-      continue;
+    let deduplicatedCount = 0;
+    const acceptedEvents: BackendEventEnvelope[] = [];
+
+    for (const event of batch.events) {
+      // Enforce both the PaperC and analysis contracts on ingest. The analysis
+      // validator restricts which apps may emit findings and pins the payload
+      // shape; it is called for that throw-on-violation side effect only. We
+      // keep the paperc-validated event (with its full payload) rather than the
+      // validator's return value, because the analysis payload schema strips
+      // unknown keys — including `tournamentId`, which the store needs to scope
+      // findings to a tournament.
+      const validatedEvent = validatePapercEventContract(
+        backendEventEnvelopeSchema.parse(event),
+      );
+      validateAnalysisEventContract(validatedEvent);
+      if (!store.hasSession(validatedEvent.sourceApp, validatedEvent.sourceSessionId)) {
+        throw new Error(
+          `unknown session ${validatedEvent.sourceSessionId} for source app ${validatedEvent.sourceApp}`,
+        );
+      }
+
+      if (
+        store.hasEvent(
+          validatedEvent.sourceApp,
+          validatedEvent.sourceSessionId,
+          validatedEvent.eventId,
+        )
+      ) {
+        deduplicatedCount += 1;
+        continue;
+      }
+
+      store.appendEvent(validatedEvent);
+      acceptedEvents.push(validatedEvent);
     }
 
-    acceptedEvents.push(validatedEvent);
-    eventMap.set(key, validatedEvent);
-  }
+    if (batch.idempotencyKey) {
+      store.rememberBatchKey("events", batch.idempotencyKey);
+    }
 
-  store.sessions = [...sessionMap.values()];
-  store.events = [...eventMap.values()];
-
-  if (batch.idempotencyKey) {
-    store.seenBatchKeys = [...store.seenBatchKeys, batch.idempotencyKey];
-  }
-
-  persistStore(store);
-
-  return {
-    acceptedSessions,
-    acceptedEvents,
-    deduplicatedCount,
-    duplicateBatch: false,
-    totalStoredSessions: store.sessions.length,
-    totalStoredEvents: store.events.length,
-  };
+    return {
+      acceptedSessions,
+      acceptedEvents,
+      deduplicatedCount,
+      duplicateBatch: false,
+      totalStoredSessions: store.countSessions(),
+      totalStoredEvents: store.countEvents(),
+    };
+  });
 }
 
 export function upsertMediaState(
-  store: EventStore,
+  storeLike: BackendStoreLike,
   session: MediaCaptureSession,
   artifacts: MediaArtifact[],
   idempotencyKey?: string,
@@ -164,114 +128,48 @@ export function upsertMediaState(
   totalStoredMediaSessions: number;
   totalStoredMediaArtifacts: number;
 } {
-  if (idempotencyKey && store.seenMediaBatchKeys.includes(idempotencyKey)) {
+  const store = resolveStore(storeLike);
+
+  if (idempotencyKey && store.hasSeenBatchKey("media", idempotencyKey)) {
     return {
       createdSession: false,
       acceptedArtifactCount: 0,
       duplicateArtifactCount: artifacts.length,
       duplicateBatch: true,
-      totalStoredMediaSessions: store.mediaSessions.length,
-      totalStoredMediaArtifacts: store.mediaArtifacts.length,
+      totalStoredMediaSessions: store.countMediaSessions(),
+      totalStoredMediaArtifacts: store.countMediaArtifacts(),
     };
   }
 
-  const mediaSessionMap = new Map(
-    store.mediaSessions.map((item) => [item.captureSessionId, item]),
-  );
-  const createdSession = !mediaSessionMap.has(session.captureSessionId);
-  mediaSessionMap.set(session.captureSessionId, session);
+  return store.transaction(() => {
+    const createdSession = !store.hasMediaSession(session.captureSessionId);
+    store.upsertMediaSession(session);
 
-  const artifactMap = new Map(
-    store.mediaArtifacts.map((item) => [mediaArtifactKey(item), item]),
-  );
-  let acceptedArtifactCount = 0;
-  let duplicateArtifactCount = 0;
+    let acceptedArtifactCount = 0;
+    let duplicateArtifactCount = 0;
 
-  for (const artifact of artifacts) {
-    const key = mediaArtifactKey(artifact);
-    if (artifactMap.has(key)) {
-      duplicateArtifactCount += 1;
-      continue;
+    for (const artifact of artifacts) {
+      if (store.hasMediaArtifact(artifact.captureSessionId, artifact.artifactId)) {
+        duplicateArtifactCount += 1;
+        continue;
+      }
+      store.addMediaArtifact(artifact);
+      acceptedArtifactCount += 1;
     }
-    artifactMap.set(key, artifact);
-    acceptedArtifactCount += 1;
-  }
 
-  store.mediaSessions = [...mediaSessionMap.values()];
-  store.mediaArtifacts = [...artifactMap.values()];
+    if (idempotencyKey) {
+      store.rememberBatchKey("media", idempotencyKey);
+    }
 
-  if (idempotencyKey) {
-    store.seenMediaBatchKeys = [...store.seenMediaBatchKeys, idempotencyKey];
-  }
-
-  persistStore(store);
-
-  return {
-    createdSession,
-    acceptedArtifactCount,
-    duplicateArtifactCount,
-    duplicateBatch: false,
-    totalStoredMediaSessions: store.mediaSessions.length,
-    totalStoredMediaArtifacts: store.mediaArtifacts.length,
-  };
-}
-
-function sessionKey(sourceApp: string, sourceSessionId: string): string {
-  return `${sourceApp}:${sourceSessionId}`;
-}
-
-function eventKey(event: BackendEventEnvelope): string {
-  return `${event.sourceApp}:${event.sourceSessionId}:${event.eventId}`;
-}
-
-function mediaArtifactKey(artifact: MediaArtifact): string {
-  return `${artifact.captureSessionId}:${artifact.artifactId}`;
-}
-
-function persistStore(store: EventStore): void {
-  if (!store.filePath) {
-    return;
-  }
-
-  const persisted: PersistedStoreFile = {
-    sessions: store.sessions,
-    events: store.events,
-    seenBatchKeys: store.seenBatchKeys,
-    mediaSessions: store.mediaSessions,
-    mediaArtifacts: store.mediaArtifacts,
-    seenMediaBatchKeys: store.seenMediaBatchKeys,
-  };
-  const tempPath = `${store.filePath}.tmp`;
-  writeFileSync(tempPath, JSON.stringify(persisted, null, 2));
-  renameSync(tempPath, store.filePath);
-}
-
-function parsePersistedStore(input: unknown): PersistedStoreFile {
-  const object = (input ?? {}) as Partial<PersistedStoreFile>;
-  return {
-    sessions: Array.isArray(object.sessions)
-      ? object.sessions.map((session) =>
-          validatePapercSessionContract(backendEventSessionSchema.parse(session)),
-        )
-      : [],
-    events: Array.isArray(object.events)
-      ? object.events.map((event) =>
-          validatePapercEventContract(backendEventEnvelopeSchema.parse(event)),
-        )
-      : [],
-    seenBatchKeys: Array.isArray(object.seenBatchKeys)
-      ? object.seenBatchKeys.filter((item): item is string => typeof item === "string")
-      : [],
-    mediaSessions: Array.isArray(object.mediaSessions)
-      ? object.mediaSessions.map((session) => mediaCaptureSessionSchema.parse(session))
-      : [],
-    mediaArtifacts: Array.isArray(object.mediaArtifacts)
-      ? object.mediaArtifacts.map((artifact) => mediaArtifactSchema.parse(artifact))
-      : [],
-    seenMediaBatchKeys: Array.isArray(object.seenMediaBatchKeys)
-      ? object.seenMediaBatchKeys.filter((item): item is string => typeof item === "string")
-      : [],
-  };
+    return {
+      createdSession,
+      acceptedArtifactCount,
+      duplicateArtifactCount,
+      duplicateBatch: false,
+      totalStoredMediaSessions: store.countMediaSessions(),
+      totalStoredMediaArtifacts: store.countMediaArtifacts(),
+    };
+  });
 }
 
 export type { BackendEventBatchEnvelope };

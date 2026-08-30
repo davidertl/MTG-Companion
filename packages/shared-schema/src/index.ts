@@ -32,9 +32,12 @@ export type DeckSnapshot = z.infer<typeof deckSnapshotSchema>;
 export type SyncObject = z.infer<typeof syncObjectSchema>;
 export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;
 
+export * from "./analysis.ts";
 export * from "./events.ts";
+export * from "./gameActions.ts";
 export * from "./imports.ts";
 export * from "./media.ts";
 export * from "./paperc.ts";
 export * from "./privacy.ts";
+export * from "./roles.ts";
 export * from "./tournaments.ts";

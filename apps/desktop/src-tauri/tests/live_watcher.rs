@@ -1,9 +1,10 @@
 use core_store::EventStore;
-use mancutg_arenac::watch_live_log_once;
+use mancutg_arenac::{watch_live_log_follow, watch_live_log_once};
 use std::{
     fs,
     io::Write,
-    time::{SystemTime, UNIX_EPOCH},
+    sync::mpsc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 fn temp_path(name: &str, extension: &str) -> std::path::PathBuf {
@@ -132,6 +133,187 @@ fn returns_a_clear_error_for_invalid_log_paths() {
     let error = watch_live_log_once(&missing_path, Some(store_path.to_string_lossy().as_ref()))
         .expect_err("invalid path should fail");
     assert!(error.contains("failed to read log file"));
+}
+
+// The bounded window every follow-loop assertion waits within. Generous
+// enough to be robust on slow CI, short enough to keep the suite quick.
+const FOLLOW_WINDOW: Duration = Duration::from_secs(5);
+// Fast poll interval so tests do not wait on the 2s production fallback;
+// `notify` events should trigger ingests even sooner.
+const FOLLOW_POLL: Duration = Duration::from_millis(50);
+
+#[test]
+fn follow_ingests_appends_within_bounded_window() {
+    let log_path = temp_path("follow-log", "log");
+    let store_path = temp_path("follow-store", "sqlite3");
+
+    fs::write(
+        &log_path,
+        "2026-05-07T02:00:00Z|MATCH_START|match_id=match-1|deck=Domain Ramp|queue=ranked\n",
+    )
+    .expect("initial log should be written");
+
+    let (ingest_tx, ingest_rx) = mpsc::channel::<()>();
+    let handle = watch_live_log_follow(
+        log_path.clone(),
+        Some(store_path.to_string_lossy().into_owned()),
+        FOLLOW_POLL,
+        move |_summary| {
+            let _ = ingest_tx.send(());
+        },
+    )
+    .expect("follow watcher should start");
+
+    ingest_rx
+        .recv_timeout(FOLLOW_WINDOW)
+        .expect("initial content should be ingested within the window");
+
+    fs::OpenOptions::new()
+        .append(true)
+        .open(&log_path)
+        .expect("log should open for append")
+        .write_all(b"2026-05-07T02:01:00Z|MATCH_END|match_id=match-1|result=win|queue=ranked\n")
+        .expect("append should succeed");
+
+    ingest_rx
+        .recv_timeout(FOLLOW_WINDOW)
+        .expect("appended line should be ingested within the window");
+
+    handle.stop();
+    handle.join();
+
+    let store = EventStore::open(&store_path).expect("store should be readable");
+    // Exactly two events: the checkpoint machinery prevents duplicate ingest.
+    assert_eq!(store.count_events().expect("event count should load"), 2);
+
+    fs::remove_file(log_path).expect("temporary log should be removable");
+    fs::remove_file(store_path).expect("temporary store should be removable");
+}
+
+#[test]
+fn follow_stop_is_idempotent_and_terminates_cleanly() {
+    let log_path = temp_path("follow-stop-log", "log");
+    let store_path = temp_path("follow-stop-store", "sqlite3");
+
+    fs::write(
+        &log_path,
+        "2026-05-07T02:00:00Z|MATCH_START|match_id=match-1|deck=Esper|queue=ranked\n",
+    )
+    .expect("initial log should be written");
+
+    let handle = watch_live_log_follow(
+        log_path.clone(),
+        Some(store_path.to_string_lossy().into_owned()),
+        FOLLOW_POLL,
+        |_summary| {},
+    )
+    .expect("follow watcher should start");
+
+    handle.stop();
+    // Stopping twice must be harmless.
+    handle.stop();
+    handle.join();
+
+    fs::remove_file(log_path).expect("temporary log should be removable");
+    fs::remove_file(store_path).expect("temporary store should be removable");
+}
+
+#[test]
+fn follow_handles_rotation_mid_stream() {
+    let log_path = temp_path("follow-rotate-log", "log");
+    let store_path = temp_path("follow-rotate-store", "sqlite3");
+
+    fs::write(
+        &log_path,
+        "2026-05-07T02:00:00Z|MATCH_START|match_id=match-1|deck=Domain Ramp|queue=ranked\n",
+    )
+    .expect("initial log should be written");
+
+    let (ingest_tx, ingest_rx) = mpsc::channel::<()>();
+    let handle = watch_live_log_follow(
+        log_path.clone(),
+        Some(store_path.to_string_lossy().into_owned()),
+        FOLLOW_POLL,
+        move |_summary| {
+            let _ = ingest_tx.send(());
+        },
+    )
+    .expect("follow watcher should start");
+
+    ingest_rx
+        .recv_timeout(FOLLOW_WINDOW)
+        .expect("initial content should be ingested");
+
+    // Rotation: the log is replaced by a fresh file with different content.
+    fs::write(
+        &log_path,
+        "2026-05-07T02:05:00Z|MATCH_START|match_id=match-2|deck=Boros|queue=play\n",
+    )
+    .expect("rotated log should be written");
+
+    ingest_rx
+        .recv_timeout(FOLLOW_WINDOW)
+        .expect("rotated content should be ingested without crashing");
+
+    handle.stop();
+    handle.join();
+
+    let store = EventStore::open(&store_path).expect("store should be readable");
+    // Rotation starts a fresh live session; both matches are captured.
+    assert!(
+        store
+            .load_log_sessions()
+            .expect("sessions should load")
+            .len()
+            >= 2
+    );
+    assert_eq!(store.count_events().expect("event count should load"), 2);
+
+    fs::remove_file(log_path).expect("temporary log should be removable");
+    fs::remove_file(store_path).expect("temporary store should be removable");
+}
+
+#[test]
+fn follow_waits_for_missing_file_without_crashing() {
+    let log_path = temp_path("follow-missing-log", "log");
+    let store_path = temp_path("follow-missing-store", "sqlite3");
+
+    // Intentionally do not create the log file yet.
+    let (ingest_tx, ingest_rx) = mpsc::channel::<()>();
+    let handle = watch_live_log_follow(
+        log_path.clone(),
+        Some(store_path.to_string_lossy().into_owned()),
+        FOLLOW_POLL,
+        move |_summary| {
+            let _ = ingest_tx.send(());
+        },
+    )
+    .expect("follow watcher should start even when the file is missing");
+
+    // No ingest should occur while the file is absent; the loop keeps waiting.
+    assert!(
+        ingest_rx.recv_timeout(Duration::from_millis(300)).is_err(),
+        "no events should be ingested before the log file exists"
+    );
+
+    fs::write(
+        &log_path,
+        "2026-05-07T02:00:00Z|MATCH_START|match_id=match-1|deck=Azorius|queue=ranked\n",
+    )
+    .expect("log should be creatable");
+
+    ingest_rx
+        .recv_timeout(FOLLOW_WINDOW)
+        .expect("content should be ingested once the file appears");
+
+    handle.stop();
+    handle.join();
+
+    let store = EventStore::open(&store_path).expect("store should be readable");
+    assert_eq!(store.count_events().expect("event count should load"), 1);
+
+    fs::remove_file(log_path).expect("temporary log should be removable");
+    fs::remove_file(store_path).expect("temporary store should be removable");
 }
 
 #[test]

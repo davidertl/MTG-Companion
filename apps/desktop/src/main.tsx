@@ -1,6 +1,6 @@
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { ArenaAppShell } from "./app/ArenaAppShell";
 import { buildArenaAppShellState } from "./app/buildArenaAppShellState";
 import type { ArenaAppShellInput } from "./app/buildArenaAppShellState";
@@ -10,19 +10,46 @@ import type { InventorySummary } from "./routes/inventory/index";
 import type { DraftPickView } from "./routes/draft/index";
 import type { ImportDiagnosticView } from "./routes/diagnostics/index";
 import {
+  buildMatchDetailState,
+  buildMatchAnalysisState,
+  type MatchDetailState,
+  type MatchAnalysisState,
+} from "./routes/history/index";
+import { saveBackupBundle } from "./lib/export/index";
+import {
+  readAnalysisEnabled,
+  writeAnalysisEnabled,
+} from "./lib/settings/analysisPreference";
+import {
   tauriInspectStore,
   tauriShowSettings,
+  tauriSetConsent,
   tauriWatchLog,
   tauriImportIosFile,
   tauriImportIosFolder,
   tauriExportBackup,
+  tauriInspectMatch,
+  tauriLoadGameTimeline,
+  tauriAnalyzeMatch,
+  tauriCardDbStatus,
+  tauriWriteExportFile,
+  tauriStartWatcher,
+  tauriStopWatcher,
+  tauriWatcherStatus,
+  tauriSyncNow,
   type RustLocalStoreSummary,
   type RustArenaSettings,
+  type RustWatcherStatus,
+  type RustCardDbStatus,
 } from "./lib/tauri/commands";
+import type { SyncOutcomeView } from "./routes/settings/index";
 
 function mapStoreToInput(
   store: RustLocalStoreSummary,
   settings: RustArenaSettings,
+  watcher: RustWatcherStatus | null,
+  cardDb: RustCardDbStatus | null,
+  analysisEnabled: boolean,
 ): ArenaAppShellInput {
   const matches: MatchHistoryRecord[] = store.matchHistory.map((m) => ({
     matchId: m.match_id,
@@ -64,6 +91,8 @@ function mapStoreToInput(
 
   return {
     hasDetailedLogs: store.sessions.length > 0,
+    logPath: watcher?.logPath ?? watcher?.defaultLogPath ?? undefined,
+    watcherRunning: watcher?.running ?? false,
     privacy: {
       telemetryEnabled: settings.privacy.telemetryEnabled,
       syncEnabled: settings.privacy.syncEnabled,
@@ -80,6 +109,8 @@ function mapStoreToInput(
     draftPicks,
     diagnostics,
     unknownEvents: store.unknownEvents,
+    analysisEnabled,
+    cardDb,
   };
 }
 
@@ -87,24 +118,140 @@ function App() {
   const [input, setInput] = useState<ArenaAppShellInput>({
     hasDetailedLogs: false,
   });
+  const [watcher, setWatcher] = useState<RustWatcherStatus | null>(null);
+  const [cardDb, setCardDb] = useState<RustCardDbStatus | null>(null);
+  const [syncOutcome, setSyncOutcome] = useState<SyncOutcomeView | null>(null);
+  const [analysisEnabled, setAnalysisEnabled] = useState<boolean>(() =>
+    readAnalysisEnabled(),
+  );
+  const [activeView, setActiveView] = useState<string>("Imports");
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [matchDetail, setMatchDetail] = useState<MatchDetailState | null>(null);
+  const [matchAnalysis, setMatchAnalysis] = useState<MatchAnalysisState | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [store, settings] = await Promise.all([
+    const [store, settings, status, cards] = await Promise.all([
       tauriInspectStore(),
       tauriShowSettings(),
+      tauriWatcherStatus().catch(() => null),
+      tauriCardDbStatus().catch(() => null),
     ]);
-    setInput(mapStoreToInput(store, settings));
+    setWatcher(status);
+    setCardDb(cards);
+    setInput(mapStoreToInput(store, settings, status, cards, readAnalysisEnabled()));
   }, []);
 
   useEffect(() => {
     refresh()
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : String(err)),
-      )
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, [refresh]);
+
+  // Poll the live watcher status so the UI reflects real watcher state
+  // (replacing the previously hardcoded `watcherRunning = false`).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      tauriWatcherStatus()
+        .then((status) => {
+          setWatcher(status);
+          setInput((prev) => ({ ...prev, watcherRunning: status.running }));
+        })
+        .catch(() => {
+          /* watcher status is best-effort; ignore transient failures */
+        });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSelectMatch = useCallback(
+    async (matchId: string) => {
+      setSelectedMatchId(matchId);
+      setDetailLoading(true);
+      setMatchAnalysis(null);
+      try {
+        const [inspection, timeline, cards] = await Promise.all([
+          tauriInspectMatch(matchId),
+          tauriLoadGameTimeline(matchId).catch(() => null),
+          tauriCardDbStatus().catch(() => cardDb),
+        ]);
+        setMatchDetail(buildMatchDetailState(inspection.matchId, inspection.events));
+        if (timeline) {
+          // Build the analysis view up front with no findings; the user runs
+          // the deterministic engine explicitly via "Run analysis".
+          setMatchAnalysis(
+            buildMatchAnalysisState({
+              matchId: timeline.matchId,
+              timeline: timeline.timeline,
+              findings: [],
+              cardDb: cards,
+              analysisRun: false,
+            }),
+          );
+        }
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setMatchDetail(null);
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [cardDb],
+  );
+
+  const handleRunAnalysis = useCallback(
+    async (matchId: string) => {
+      setAnalysisLoading(true);
+      try {
+        const [analysis, timeline, cards] = await Promise.all([
+          tauriAnalyzeMatch(matchId),
+          tauriLoadGameTimeline(matchId).catch(() => null),
+          tauriCardDbStatus().catch(() => cardDb),
+        ]);
+        setCardDb(cards);
+        if (timeline) {
+          setMatchAnalysis(
+            buildMatchAnalysisState({
+              matchId: analysis.matchId,
+              timeline: timeline.timeline,
+              findings: analysis.findings,
+              cardDb: cards,
+              analysisRun: true,
+            }),
+          );
+        }
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setAnalysisLoading(false);
+      }
+    },
+    [cardDb],
+  );
+
+  const handleToggleAnalysis = useCallback((enabled: boolean) => {
+    writeAnalysisEnabled(enabled);
+    setAnalysisEnabled(enabled);
+    setInput((prev) => ({ ...prev, analysisEnabled: enabled }));
+  }, []);
+
+  const handleToggleConsent = useCallback(
+    async (purpose: string, enabled: boolean) => {
+      try {
+        await tauriSetConsent(purpose, enabled);
+        await refresh();
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [refresh],
+  );
 
   const handleAction = useCallback(
     async (label: string) => {
@@ -125,10 +272,7 @@ function App() {
             await tauriImportIosFolder(selected);
             await refresh();
           }
-        } else if (
-          label === "Import desktop log" ||
-          label === "Start live watcher"
-        ) {
+        } else if (label === "Import desktop log") {
           const selected = await open({
             filters: [{ name: "Log", extensions: ["log", "txt"] }],
           });
@@ -136,15 +280,54 @@ function App() {
             await tauriWatchLog(selected);
             await refresh();
           }
+        } else if (label === "Start live watcher") {
+          // Prefer the OS default Arena log path; fall back to a picked file
+          // when no default is known (e.g. Linux dev hosts).
+          let logPath = watcher?.defaultLogPath ?? undefined;
+          if (!logPath) {
+            const selected = await open({
+              filters: [{ name: "Log", extensions: ["log", "txt"] }],
+            });
+            logPath = selected && typeof selected === "string" ? selected : undefined;
+            if (!logPath) {
+              return;
+            }
+          }
+          const status = await tauriStartWatcher(logPath);
+          setWatcher(status);
+          await refresh();
+        } else if (label === "Stop live watcher") {
+          const status = await tauriStopWatcher();
+          setWatcher(status);
+          await refresh();
         } else if (label === "Export backup bundle") {
-          await tauriExportBackup();
+          const bundle = await tauriExportBackup();
+          await saveBackupBundle(bundle, {
+            pickPath: (defaultName) =>
+              save({
+                defaultPath: defaultName,
+                filters: [{ name: "JSON", extensions: ["json"] }],
+              }),
+            writeFile: tauriWriteExportFile,
+          });
+        } else if (label === "Sync now") {
+          // Hard-gated on the Rust side: when sync consent is off this is a
+          // no-op that makes zero network calls.
+          const outcome = await tauriSyncNow();
+          setSyncOutcome({
+            attempted: outcome.attempted,
+            eventsSynced: outcome.eventsSynced,
+            pendingRemaining: outcome.pendingRemaining,
+            lastError: outcome.lastError,
+          });
+          await refresh();
         }
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [refresh],
+    [refresh, watcher],
   );
 
   if (loading) {
@@ -166,7 +349,7 @@ function App() {
     );
   }
 
-  const state = buildArenaAppShellState(input);
+  const state = buildArenaAppShellState({ ...input, syncOutcome });
 
   return (
     <>
@@ -192,7 +375,24 @@ function App() {
           {error}
         </div>
       )}
-      <ArenaAppShell state={state} onAction={handleAction} />
+      <ArenaAppShell
+        state={state}
+        activeView={activeView}
+        onSelectView={setActiveView}
+        onAction={handleAction}
+        onToggleConsent={handleToggleConsent}
+        onToggleAnalysis={handleToggleAnalysis}
+        history={{
+          selectedMatchId,
+          onSelectMatch: handleSelectMatch,
+          detail: matchDetail,
+          detailLoading,
+          analysis: matchAnalysis,
+          analysisLoading,
+          analysisEnabled,
+          onRunAnalysis: handleRunAnalysis,
+        }}
+      />
     </>
   );
 }

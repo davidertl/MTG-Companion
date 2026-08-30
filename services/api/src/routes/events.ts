@@ -3,7 +3,7 @@ import {
   type BackendEventEnvelope,
   type BackendEventSession,
 } from "../../../../packages/shared-schema/src/index.ts";
-import { applyBackendEventBatch, type EventStore } from "../domain/eventService.ts";
+import { applyBackendEventBatch, type BackendStoreLike } from "../domain/eventService.ts";
 
 export interface EventsRouteResult {
   acceptedSessionCount: number;
@@ -16,7 +16,7 @@ export interface EventsRouteResult {
   sourceSessionIds: Array<BackendEventSession["sourceSessionId"]>;
 }
 
-export function eventsRoute(input: unknown, store: EventStore): EventsRouteResult {
+export function eventsRoute(input: unknown, store: BackendStoreLike): EventsRouteResult {
   const payload = backendEventBatchEnvelopeSchema.parse(input);
   const result = applyBackendEventBatch(store, payload);
 

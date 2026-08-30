@@ -1,0 +1,46 @@
+[UnityCrossThreadLogger]6/28/2026 5:00:01 PM: Match to Anon: MatchGameRoomStateChangedEvent
+{"matchGameRoomStateChangedEvent":{"gameRoomInfo":{"gameRoomConfig":{"matchId":"synthetic-match-0003","reservedPlayers":[{"userId":"anon-1","playerName":"PlayerOne","systemSeatId":1,"teamId":1},{"userId":"anon-2","playerName":"PlayerTwo","systemSeatId":2,"teamId":2}]},"stateType":"MatchGameRoomStateType_Playing"}},"timestamp":"638500000000002001"}
+[UnityCrossThreadLogger]6/28/2026 5:00:04 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0201","timestamp":"638500000000002002","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_ConnectResp","msgId":1,"connectResp":{"status":"ConnectionStatus_Connected"}},{"type":"GREMessageType_DieRollResultsResp","msgId":2,"dieRollResultsResp":{"playerDieRolls":[{"systemSeatId":1,"rollValue":6},{"systemSeatId":2,"rollValue":2}]}},{"type":"GREMessageType_MulliganReq","systemSeatIds":[1],"msgId":3,"gameStateId":1,"mulliganReq":{"mulliganCount":0},"prompt":{"promptId":2}}]}}
+[UnityCrossThreadLogger]==> ClientToMatchServiceMessage {"requestId":6,"timestamp":"638500000000002003","clientToMatchServiceMessageType":"ClientToMatchServiceMessageType_ClientToGREMessage","payload":{"gameStateId":1,"respId":3,"type":"ClientMessageType_MulliganResp","mulliganResp":{"decision":"MulliganOption_Mulligan"}}}
+[UnityCrossThreadLogger]6/28/2026 5:00:21 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0202","timestamp":"638500000000002004","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_MulliganReq","systemSeatIds":[1],"msgId":5,"gameStateId":2,"mulliganReq":{"mulliganCount":1},"prompt":{"promptId":2}}]}}
+[UnityCrossThreadLogger]==> ClientToMatchServiceMessage {"requestId":7,"timestamp":"638500000000002005","clientToMatchServiceMessageType":"ClientToMatchServiceMessageType_ClientToGREMessage","payload":{"gameStateId":2,"respId":5,"type":"ClientMessageType_MulliganResp","mulliganResp":{"decision":"MulliganOption_AcceptHand"}}}
+[UnityCrossThreadLogger]6/28/2026 5:00:30 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0203","timestamp":"638500000000002006","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_GameStateMessage","systemSeatIds":[1],"msgId":6,"gameStateId":3,"gameStateMessage":{"type":"GameStateType_Full","gameStateId":3,"gameInfo":{"matchID":"synthetic-match-0003","gameNumber":1,"stage":"GameStage_Play","matchState":"MatchState_GameInProgress"},"players":[{"lifeTotal":20,"systemSeatNumber":1,"teamId":1,"controllerSeatId":1},{"lifeTotal":20,"systemSeatNumber":2,"teamId":2,"controllerSeatId":2}],"turnInfo":{"phase":"Phase_Beginning","step":"Step_Upkeep","turnNumber":1,"activePlayer":1,"priorityPlayer":1},"zones":[{"zoneId":27,"type":"ZoneType_Stack","visibility":"Visibility_Public"},{"zoneId":28,"type":"ZoneType_Battlefield","visibility":"Visibility_Public"},{"zoneId":31,"type":"ZoneType_Hand","visibility":"Visibility_Private","ownerSeatId":1},{"zoneId":33,"type":"ZoneType_Graveyard","visibility":"Visibility_Public","ownerSeatId":1}],"gameObjects":[{"instanceId":501,"grpId":90001,"type":"GameObjectType_Card","zoneId":31,"ownerSeatId":1,"controllerSeatId":1,"cardTypes":["CardType_Land"]},{"instanceId":502,"grpId":90002,"type":"GameObjectType_Card","zoneId":31,"ownerSeatId":1,"controllerSeatId":1,"cardTypes":["CardType_Creature"]}]}}]}}
+[UnityCrossThreadLogger]6/28/2026 5:00:44 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0204","timestamp":"638500000000002007","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_GameStateMessage","systemSeatIds":[1],"msgId":7,"gameStateId":4,"gameStateMessage":{"type":"GameStateType_Diff","gameStateId":4,"gameObjects":[{"instanceId":501,"grpId":90001,"type":"GameObjectType_Card","zoneId":28,"ownerSeatId":1,"controllerSeatId":1,"cardTypes":["CardType_Land"]}],"annotations":[{"id":601,"affectorId":1,"affectedIds":[501],"type":["AnnotationType_ZoneTransfer"],"details":[{"key":"zone_src","type":"KeyValuePairValueType_int32","valueInt32":[31]},{"key":"zone_dest","type":"KeyValuePairValueType_int32","valueInt32":[28]},{"key":"category","type":"KeyValuePairValueType_string","valueString":["PlayLand"]}]}],"turnInfo":{"phase":"Phase_Main1","turnNumber":1,"activePlayer":1,"priorityPlayer":1}}}]}}
+[UnityCrossThreadLogger]6/28/2026 5:00:52 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0205","timestamp":"638500000000002008","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_GameStateMessage","systemSeatIds":[1],"msgId":8,"gameStateId":5,"gameStateMessage":{"type":"GameStateType_Diff","gameStateId":5,"gameObjects":[{"instanceId":502,"grpId":90002,"type":"GameObjectType_Card","zoneId":27,"ownerSeatId":1,"controllerSeatId":1,"cardTypes":["CardType_Creature"]}],"annotations":[{"id":602,"affectorId":1,"affectedIds":[502],"type":["AnnotationType_ZoneTransfer"],"details":[{"key":"zone_src","type":"KeyValuePairValueType_int32","valueInt32":[31]},{"key":"zone_dest","type":"KeyValuePairValueType_int32","valueInt32":[27]},{"key":"category","type":"KeyValuePairValueType_string","valueString":["CastSpell"]}]}]}}]}}
+[UnityCrossThreadLogger]6/28/2026 5:00:58 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0206","timestamp":"638500000000002009","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_GameStateMessage","systemSeatIds":[1],"msgId":9,"gameStateId":6,"gameStateMessage":{"type":"GameStateType_Diff","gameStateId":6,"annotations":[{"id":603,"affectorId":1,"affectedIds":[502],"type":["AnnotationType_ZoneTransfer"],"details":[{"key":"zone_src","type":"KeyValuePairValueType_int32","valueInt32":[27]},{"key":"zone_dest","type":"KeyValuePairValueType_int32","valueInt32":[28]},{"key":"category","type":"KeyValuePairValueType_string","valueString":["Resolve"]}]}]}}]}}
+[UnityCrossThreadLogger]6/28/2026 5:01:05 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0207","timestamp":"638500000000002010","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_GameStateMessage","systemSeatIds":[1],"msgId":10,"gameStateId":7,"gameStateMessage":{"type":"GameStateType_Diff","gameStateId":7,"gameObjects":[{"instanceId":601,"grpId":90101,"type":"GameObjectType_Ability","zoneId":27,"ownerSeatId":1,"controllerSeatId":1,"objectSourceGrpId":90001,"parentId":501},{"instanceId":701,"grpId":90102,"type":"GameObjectType_TriggerHolder","zoneId":27,"ownerSeatId":1,"controllerSeatId":1,"objectSourceGrpId":90002,"parentId":502}]}}]}}
+[UnityCrossThreadLogger]6/28/2026 5:01:20 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0208","timestamp":"638500000000002011","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_GameStateMessage","systemSeatIds":[1],"msgId":11,"gameStateId":8,"gameStateMessage":{"type":"GameStateType_Diff","gameStateId":8,"annotations":[{"id":604,"affectorId":2,"affectedIds":[],"type":["AnnotationType_NewTurnStarted"],"details":[]}],"turnInfo":{"phase":"Phase_Beginning","step":"Step_Upkeep","turnNumber":2,"activePlayer":2,"priorityPlayer":2}}}]}}
+[UnityCrossThreadLogger]6/28/2026 5:01:41 PM: Match to Anon: GreToClientEvent
+{"transactionId":"synthetic-txn-0209","timestamp":"638500000000002012","greToClientEvent":{"greToClientMessages":[{"type":"GREMessageType_GameStateMessage","systemSeatIds":[1],"msgId":12,"gameStateId":9,"gameStateMessage":{"type":"GameStateType_Diff","gameStateId":9,"gameInfo":{"matchID":"synthetic-match-0003","gameNumber":1,"stage":"GameStage_Play","matchState":"MatchState_GameComplete","results":[{"scope":"MatchScope_Game","result":"ResultType_WinLoss","winningTeamId":1,"reason":"ResultReason_Concede"}]}}}]}}
+[UnityCrossThreadLogger]6/28/2026 5:01:44 PM: Match to Anon: MatchGameRoomStateChangedEvent
+{
+  "matchGameRoomStateChangedEvent": {
+    "gameRoomInfo": {
+      "gameRoomConfig": {
+        "matchId": "synthetic-match-0003",
+        "reservedPlayers": [
+          { "userId": "anon-1", "playerName": "PlayerOne", "systemSeatId": 1, "teamId": 1 },
+          { "userId": "anon-2", "playerName": "PlayerTwo", "systemSeatId": 2, "teamId": 2 }
+        ]
+      },
+      "stateType": "MatchGameRoomStateType_MatchCompleted",
+      "finalMatchResult": {
+        "matchId": "synthetic-match-0003",
+        "matchCompletedReason": "MatchCompletedReasonType_Success",
+        "resultList": [
+          { "scope": "MatchScope_Game", "result": "ResultType_WinLoss", "winningTeamId": 1, "reason": "ResultReason_Concede" },
+          { "scope": "MatchScope_Match", "result": "ResultType_WinLoss", "winningTeamId": 1 }
+        ]
+      }
+    }
+  },
+  "timestamp": "638500000000002013"
+}

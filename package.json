@@ -9,12 +9,15 @@
     "arenac:smoke": "bash scripts/arenac_smoke.sh",
     "arenac:dev": "cd apps/desktop && npm install && tauri dev -- -- --features gui",
     "arenac:bundle": "cd apps/desktop && npm install && tauri build -- --features gui",
+    "paperc:dev": "cd apps/paperc && npm install && vite",
+    "paperc:build": "cd apps/paperc && npm install && vite build",
     "desktop:help": "cargo run -p mancutg-arenac --bin mancutg-arenac-cli -- --help",
     "typecheck": "tsc --noEmit",
     "test:ts": "vitest run",
     "test:rust": "cargo test --workspace",
     "test:python": "python3 -m unittest discover -s services/archidekt-connector/tests -p \"test_*.py\"",
-    "test": "npm run typecheck && npm run test:ts && npm run test:rust && npm run test:python"
+    "test": "npm run typecheck && npm run test:ts && npm run test:rust && npm run test:python",
+    "verify:all": "bash scripts/verify_all.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

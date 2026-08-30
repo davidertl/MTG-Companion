@@ -5,6 +5,7 @@ import type {
   BackendEventSession,
   EventSourceApp,
 } from "./events.ts";
+import { gameActionSchema } from "./gameActions.ts";
 import { tournamentContextSchema } from "./tournaments.ts";
 
 export const papercEventTypeSchema = z.enum([
@@ -45,6 +46,10 @@ export const papercObservationPayloadSchema = papercCaptureContextSchema.extend(
       frameTimeMs: z.number().int().nonnegative().optional(),
     })
     .optional(),
+  // Typed game action (shared Arena/Paper vocabulary, plan 2026-07-06-001
+  // W0.1). Optional for backward compatibility: legacy observations carry
+  // only the raw `details` record, which remains as an escape hatch.
+  action: gameActionSchema.optional(),
   details: z.record(z.string(), z.unknown()).default({}),
 });
 

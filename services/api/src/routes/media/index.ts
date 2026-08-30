@@ -1,5 +1,5 @@
 import { mediaIngestRequestSchema } from "../../../../../packages/shared-schema/src/index.ts";
-import type { EventStore } from "../../domain/eventService.ts";
+import type { BackendStoreLike } from "../../domain/eventService.ts";
 import { ingestMediaSession } from "../../domain/paperc/mediaSessionService.ts";
 
 export interface MediaIngestRouteResult {
@@ -14,7 +14,7 @@ export interface MediaIngestRouteResult {
 
 export function mediaSessionsRoute(
   input: unknown,
-  store: EventStore,
+  store: BackendStoreLike,
 ): MediaIngestRouteResult {
   const request = mediaIngestRequestSchema.parse(input);
   const result = ingestMediaSession(store, request);
